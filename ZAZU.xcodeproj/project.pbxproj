@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		6D380910306D9B3800255E72 /* SwipeCardsKit in Frameworks */ = {isa = PBXBuildFile; productRef = 6D38090F306D9B3800255E72 /* SwipeCardsKit */; };
+		6DFE73A5306ADD2600AF454D /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 6DFE73A4306ADD2600AF454D /* Supabase */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		6DFE7365306ACFE000AF454D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,14 +29,31 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		6D380932307268B400255E72 /* ZAZU.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = ZAZU.xctestplan; sourceTree = "<group>"; };
 		6DFE7357306ACFDE00AF454D /* ZAZU.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ZAZU.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6DFE7364306ACFE000AF454D /* ZAZUTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZAZUTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6DFE736E306ACFE100AF454D /* ZAZUUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ZAZUUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		6DFE73A0306ADC0800AF454D /* Exceptions for "ZAZU" folder in "ZAZU" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Core/Untitled.swift,
+				Info.plist,
+				"Model/Untitled 2.swift",
+				Model/Untitled.swift,
+			);
+			target = 6DFE7356306ACFDE00AF454D /* ZAZU */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		6DFE7359306ACFDE00AF454D /* ZAZU */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6DFE73A0306ADC0800AF454D /* Exceptions for "ZAZU" folder in "ZAZU" target */,
+			);
 			path = ZAZU;
 			sourceTree = "<group>";
 		};
@@ -52,6 +74,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6D380910306D9B3800255E72 /* SwipeCardsKit in Frameworks */,
+				6DFE73A5306ADD2600AF454D /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,9 +99,11 @@
 		6DFE734E306ACFDE00AF454D = {
 			isa = PBXGroup;
 			children = (
+				6D380932307268B400255E72 /* ZAZU.xctestplan */,
 				6DFE7359306ACFDE00AF454D /* ZAZU */,
 				6DFE7367306ACFE000AF454D /* ZAZUTests */,
 				6DFE7371306ACFE100AF454D /* ZAZUUITests */,
+				6DFE73A3306ADD0000AF454D /* Frameworks */,
 				6DFE7358306ACFDE00AF454D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +116,13 @@
 				6DFE736E306ACFE100AF454D /* ZAZUUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		6DFE73A3306ADD0000AF454D /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -112,6 +145,8 @@
 			);
 			name = ZAZU;
 			packageProductDependencies = (
+				6DFE73A4306ADD2600AF454D /* Supabase */,
+				6D38090F306D9B3800255E72 /* SwipeCardsKit */,
 			);
 			productName = ZAZU;
 			productReference = 6DFE7357306ACFDE00AF454D /* ZAZU.app */;
@@ -195,6 +230,10 @@
 			);
 			mainGroup = 6DFE734E306ACFDE00AF454D;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				6DFE7396306AD6BE00AF454D /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				6D38090E306D98ED00255E72 /* XCRemoteSwiftPackageReference "SwipeCardsKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6DFE7358306ACFDE00AF454D /* Products */;
 			projectDirPath = "";
@@ -271,6 +310,8 @@
 /* Begin XCBuildConfiguration section */
 		6DFE7376306ACFE100AF454D /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 6DFE7359306ACFDE00AF454D /* ZAZU */;
+			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -333,6 +374,8 @@
 		};
 		6DFE7377306ACFE100AF454D /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 6DFE7359306ACFDE00AF454D /* ZAZU */;
+			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -390,6 +433,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = K9GS6P7ZKP;
@@ -398,6 +442,9 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ZAZU/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Zazu PoC";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -418,13 +465,14 @@
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = 1;
 				XROS_DEPLOYMENT_TARGET = 26.5;
 			};
 			name = Debug;
@@ -434,6 +482,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = K9GS6P7ZKP;
@@ -442,6 +491,9 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ZAZU/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Zazu PoC";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.business";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -462,13 +514,14 @@
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = 1;
 				XROS_DEPLOYMENT_TARGET = 26.5;
 			};
 			name = Release;
@@ -615,6 +668,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		6D38090E306D98ED00255E72 /* XCRemoteSwiftPackageReference "SwipeCardsKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/tobi404/SwipeCardsKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.2.2;
+			};
+		};
+		6DFE7396306AD6BE00AF454D /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		6D38090F306D9B3800255E72 /* SwipeCardsKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6D38090E306D98ED00255E72 /* XCRemoteSwiftPackageReference "SwipeCardsKit" */;
+			productName = SwipeCardsKit;
+		};
+		6DFE73A4306ADD2600AF454D /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6DFE7396306AD6BE00AF454D /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 6DFE734F306ACFDE00AF454D /* Project object */;
 }

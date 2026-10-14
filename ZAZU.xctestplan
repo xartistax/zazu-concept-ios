@@ -1,0 +1,39 @@
+{
+  "configurations" : [
+    {
+      "id" : "F5D23A97-707A-4E85-B0F4-E4666A13C750",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:ZAZU.xcodeproj",
+      "identifier" : "6DFE7356306ACFDE00AF454D",
+      "name" : "ZAZU"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:ZAZU.xcodeproj",
+        "identifier" : "6DFE7363306ACFE000AF454D",
+        "name" : "ZAZUTests"
+      }
+    },
+    {
+      "enabled" : false,
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:ZAZU.xcodeproj",
+        "identifier" : "6DFE736D306ACFE100AF454D",
+        "name" : "ZAZUUITests"
+      }
+    }
+  ],
+  "version" : 1
+}
