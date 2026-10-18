@@ -13,6 +13,7 @@ import Observation
 final class WorkExperienceViewModel {
 
     var experiences: [WorkExperience] = []
+    var hasNoWorkExperience = false
 
     var jobTitle = ""
     var employerName = ""
@@ -27,6 +28,8 @@ final class WorkExperienceViewModel {
     var isLoading = false
     var isSaving = false
     var errorMessage: String?
+    
+    
 
     private let workExperienceRepository: WorkExperienceRepository
     private let candidateProfileRepository: CandidateProfileRepository
@@ -65,6 +68,13 @@ final class WorkExperienceViewModel {
             experiences = try await workExperienceRepository.fetchAll(
                 candidateId: candidateId
             )
+
+            let status = try await candidateProfileRepository
+                .fetchWorkExperienceStatus(userId: candidateId)
+
+            hasNoWorkExperience =
+                status == "no_experience" && experiences.isEmpty
+
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -98,6 +108,13 @@ final class WorkExperienceViewModel {
                 candidateId: candidateId
             )
 
+            hasNoWorkExperience = false
+
+            try await candidateProfileRepository.updateWorkExperienceStatus(
+                userId: candidateId,
+                status: "has_experience"
+            )
+
             resetForm()
 
             return true
@@ -122,17 +139,29 @@ final class WorkExperienceViewModel {
     }
 
     func completeStep() async -> Bool {
-        guard !experiences.isEmpty else {
-            errorMessage = "Füge mindestens eine Berufserfahrung hinzu."
+        errorMessage = nil
+
+        guard !experiences.isEmpty || hasNoWorkExperience else {
+            errorMessage = """
+            Bitte füge eine Berufserfahrung hinzu oder wähle \
+            «Ich habe noch keine Berufserfahrung».
+            """
             return false
         }
 
-        errorMessage = nil
+        let status = experiences.isEmpty
+            ? "no_experience"
+            : "has_experience"
 
         do {
+            try await candidateProfileRepository.updateWorkExperienceStatus(
+                userId: candidateId,
+                status: status
+            )
+
             try await candidateProfileRepository.updateOnboardingStep(
                 userId: candidateId,
-                step: 2
+                step: 3
             )
 
             return true

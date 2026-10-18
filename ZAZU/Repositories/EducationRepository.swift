@@ -109,7 +109,10 @@ final class EducationRepository {
         startDate: Date?,
         endDate: Date?,
         isCurrent: Bool,
-        description: String?
+        description: String?,
+        educationLevel: String? = nil,
+        completionStatus: String? = nil,
+        qualificationId: UUID? = nil
     ) async throws {
         let payload = EducationInsert(
             candidateId: candidateId,
@@ -125,7 +128,10 @@ final class EducationRepository {
                     Self.dateOnlyFormatter.string(from: $0)
                 },
             isCurrent: isCurrent,
-            description: description
+            description: description,
+            educationLevel: educationLevel,
+            completionStatus: completionStatus,
+            qualificationId: qualificationId
         )
 
         try await client
@@ -143,6 +149,35 @@ final class EducationRepository {
             .eq("id", value: id)
             .execute()
     }
+    
+    
+    func searchQualifications(
+        educationLevel: String,
+        searchText: String
+    ) async throws -> [EducationQualification] {
+        var query = client
+            .from("education_qualifications")
+            .select("id, education_level, name")
+            .eq("education_level", value: educationLevel)
+            .eq("is_active", value: true)
+
+        let trimmedSearch = searchText.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        if !trimmedSearch.isEmpty {
+            query = query.ilike(
+                "name",
+                pattern: "%\(trimmedSearch)%"
+            )
+        }
+
+        return try await query
+            .order("name", ascending: true)
+            .limit(50)
+            .execute()
+            .value
+    }
 }
 
 private struct EducationInsert: Encodable {
@@ -157,6 +192,11 @@ private struct EducationInsert: Encodable {
 
     let description: String?
 
+    let educationLevel: String?
+    let completionStatus: String?
+    let qualificationId: UUID?
+    
+
     enum CodingKeys: String, CodingKey {
         case candidateId = "candidate_id"
         case institutionName = "institution_name"
@@ -166,5 +206,8 @@ private struct EducationInsert: Encodable {
         case endDate = "end_date"
         case isCurrent = "is_current"
         case description
+        case educationLevel = "education_level"
+        case completionStatus = "completion_status"
+        case qualificationId = "qualification_id"
     }
 }

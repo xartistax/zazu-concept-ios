@@ -51,14 +51,19 @@ struct SkillsView: View {
                     loadingView
                 } else {
                     selectedSkillsSection
-                    availableSkillsSection
+
+                    if viewModel.hasSearchQuery {
+                        availableSkillsSection
+                    } else {
+                        searchHint
+                    }
+
                     errorMessage
 
                     if mode == .onboarding {
                         continueButton
                     }
-                }
-            }
+                }            }
             .padding(ZAZUSpacing.large)
         }
         .background(ZAZUColors.veryLightPurple)
@@ -102,6 +107,43 @@ struct SkillsView: View {
                 .tint(ZAZUColors.primary)
         }
     }
+    
+    
+    // MARK: - Search Hint
+
+    private var searchHint: some View {
+        VStack(
+            alignment: .leading,
+            spacing: ZAZUSpacing.small
+        ) {
+            Label(
+                "Fähigkeiten entdecken",
+                systemImage: "magnifyingglass"
+            )
+            .font(.headline)
+            .foregroundStyle(ZAZUColors.textPrimary)
+
+            Text(
+                "Gib mindestens zwei Buchstaben ein, um nach Fähigkeiten, Fachwissen oder Systemkenntnissen zu suchen."
+            )
+            .font(.subheadline)
+            .foregroundStyle(ZAZUColors.textSecondary)
+
+            Text(
+                "Du kannst mehrere Skills auswählen und jeweils dein Kenntnisniveau angeben."
+            )
+            .font(.caption)
+            .foregroundStyle(ZAZUColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(ZAZUSpacing.medium)
+        .background(ZAZUColors.white)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: ZAZURadius.medium
+            )
+        )
+    }
 
     private var title: some View {
         VStack(
@@ -133,6 +175,9 @@ struct SkillsView: View {
             )
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
+            .onChange(of: viewModel.searchText) { _, _ in
+                viewModel.scheduleSearch()
+            }
 
             if !viewModel.searchText.isEmpty {
                 Button {
@@ -166,7 +211,7 @@ struct SkillsView: View {
                     id: \.self
                 ) { category in
                     categoryButton(
-                        title: category,
+                        title: viewModel.categoryTitle(category),
                         category: category
                     )
                 }
@@ -183,6 +228,7 @@ struct SkillsView: View {
 
         return Button {
             viewModel.selectedCategory = category
+            viewModel.scheduleSearch()
         } label: {
             Text(title)
                 .font(.subheadline)
@@ -331,17 +377,20 @@ struct SkillsView: View {
                 .font(.headline)
                 .foregroundStyle(ZAZUColors.textPrimary)
 
-            if viewModel.filteredSkills.isEmpty {
+            if viewModel.isSearching {
+                ProgressView("Skills werden gesucht …")
+                    .tint(ZAZUColors.primary)
+                    .padding(.vertical, ZAZUSpacing.medium)
+
+            } else if viewModel.filteredSkills.isEmpty {
                 Text("Keine passenden Skills gefunden.")
                     .foregroundStyle(ZAZUColors.textSecondary)
                     .padding(.vertical, ZAZUSpacing.medium)
+
             } else {
                 ForEach(viewModel.filteredSkills) { skill in
                     skillRow(skill)
                 }
-                
-                
-                
             }
             
             Button {

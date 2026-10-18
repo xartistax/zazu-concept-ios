@@ -15,8 +15,7 @@ final class SkillRepository {
         self.client = client
     }
     
-    
-    
+
     
     
     func deleteAllCandidateSkills(
@@ -94,13 +93,94 @@ final class SkillRepository {
     }
     
     
+
+
+
+
     // MARK: - Taxonomy
 
     func fetchSkills() async throws -> [Skill] {
-        try await client
+        var allSkills: [Skill] = []
+        let pageSize = 1_000
+        var offset = 0
+
+        while true {
+            let page: [Skill] = try await client
+                .from("skills")
+                .select("id, name, category")
+                .order("id", ascending: true)
+                .range(
+                    from: offset,
+                    to: offset + pageSize - 1
+                )
+                .execute()
+                .value
+
+            allSkills.append(contentsOf: page)
+
+            if page.count < pageSize {
+                break
+            }
+
+            offset += pageSize
+        }
+
+        return allSkills
+    }
+
+
+    func searchSkills(
+        query: String,
+        category: String? = nil
+    ) async throws -> [Skill] {
+
+        let trimmedQuery = query.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        guard trimmedQuery.count >= 2 else {
+            return []
+        }
+
+        let escapedQuery = trimmedQuery
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "%", with: "\\%")
+            .replacingOccurrences(of: "_", with: "\\_")
+
+        var request = client
             .from("skills")
             .select("id, name, category")
-            .order("category", ascending: true)
+            .ilike(
+                "name",
+                pattern: "%\(escapedQuery)%"
+            )
+
+        if let category {
+            request = request.eq(
+                "category",
+                value: category
+            )
+        }
+
+        return try await request
+            .order("name", ascending: true)
+            .limit(30)
+            .execute()
+            .value
+    }
+
+    func fetchSkillsByIds(
+        _ ids: [UUID]
+    ) async throws -> [Skill] {
+
+        guard !ids.isEmpty else {
+            return []
+        }
+
+        return try await client
+            .from("skills")
+            .select("id, name, category")
+            .in("id", values: ids)
             .order("name", ascending: true)
             .execute()
             .value

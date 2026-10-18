@@ -1,3 +1,5 @@
+
+
 //
 //  CandidateProfileRepository.swift
 //  ZAZU
@@ -9,145 +11,122 @@ import Foundation
 import Supabase
 
 final class CandidateProfileRepository {
+
     private let client: SupabaseClient
 
     init(client: SupabaseClient) {
         self.client = client
     }
-    
+
+    // MARK: - Reset
+
+    /// Setzt das Onboarding des angemeldeten Testkontos vollständig zurück.
+    /// Die PostgreSQL-Funktion verwendet auth.uid().
+    /// Der Parameter userId bleibt für bestehende Aufrufstellen erhalten.
     func resetForPoC(
         userId: UUID
     ) async throws {
-        struct Update: Encodable {
-            let region: String?
-            let regionLatitude: Double?
-            let regionLongitude: Double?
-            let nationality: String?
-            let hasWorkAuthorization: Bool?
-            let workAuthorizationDetails: String?
+        try await client
+            .rpc("reset_my_candidate_onboarding")
+            .execute()
+    }
 
-            let desiredWorkloadMin: Int?
-            let desiredWorkloadMax: Int?
-            let desiredWorkLocation: String?
-            let desiredWorkLatitude: Double?
-            let desiredWorkLongitude: Double?
-            let workRadiusKm: Int?
-            let willingToCommute: Bool?
-            let willingToRelocate: Bool?
-            let earliestStartDate: String?
+    // MARK: - Education Status
 
-            let preferredWorkModel: PreferredWorkModel?
-            let homeofficePreference: HomeofficePreference?
-            let desiredHomeofficeDays: Int?
-            let preferredHomeofficeSchedule: HomeofficeSchedulePreference?
-            let acceptsFullyRemote: Bool?
-            let salaryMin: Int?
-            let salaryMax: Int?
+    func fetchEducationStatus(
+        userId: UUID
+    ) async throws -> String? {
 
-            let onboardingStep: Int
-            let onboardingCompleted: Bool
+        struct Result: Decodable {
+            let educationStatus: String?
 
             enum CodingKeys: String, CodingKey {
-                case region
-                case regionLatitude = "region_latitude"
-                case regionLongitude = "region_longitude"
-                case nationality
-                case hasWorkAuthorization = "has_work_authorization"
-                case workAuthorizationDetails = "work_authorization_details"
-
-                case desiredWorkloadMin = "desired_workload_min"
-                case desiredWorkloadMax = "desired_workload_max"
-                case desiredWorkLocation = "desired_work_location"
-                case desiredWorkLatitude = "desired_work_latitude"
-                case desiredWorkLongitude = "desired_work_longitude"
-                case workRadiusKm = "work_radius_km"
-                case willingToCommute = "willing_to_commute"
-                case willingToRelocate = "willing_to_relocate"
-                case earliestStartDate = "earliest_start_date"
-
-                case preferredWorkModel = "preferred_work_model"
-                case homeofficePreference = "homeoffice_preference"
-                case desiredHomeofficeDays = "desired_homeoffice_days"
-                case preferredHomeofficeSchedule = "preferred_homeoffice_schedule"
-                case acceptsFullyRemote = "accepts_fully_remote"
-                case salaryMin = "salary_min"
-                case salaryMax = "salary_max"
-
-                case onboardingStep = "onboarding_step"
-                case onboardingCompleted = "onboarding_completed"
-            }
-            
-            func encode(to encoder: Encoder) throws {
-                var container = encoder.container(keyedBy: CodingKeys.self)
-
-                try container.encode(region, forKey: .region)
-                try container.encode(regionLatitude, forKey: .regionLatitude)
-                try container.encode(regionLongitude, forKey: .regionLongitude)
-                try container.encode(nationality, forKey: .nationality)
-                try container.encode(hasWorkAuthorization, forKey: .hasWorkAuthorization)
-                try container.encode(workAuthorizationDetails, forKey: .workAuthorizationDetails)
-
-                try container.encode(desiredWorkloadMin, forKey: .desiredWorkloadMin)
-                try container.encode(desiredWorkloadMax, forKey: .desiredWorkloadMax)
-                try container.encode(desiredWorkLocation, forKey: .desiredWorkLocation)
-                try container.encode(desiredWorkLatitude, forKey: .desiredWorkLatitude)
-                try container.encode(desiredWorkLongitude, forKey: .desiredWorkLongitude)
-                try container.encode(workRadiusKm, forKey: .workRadiusKm)
-                try container.encode(willingToCommute, forKey: .willingToCommute)
-                try container.encode(willingToRelocate, forKey: .willingToRelocate)
-                try container.encode(earliestStartDate, forKey: .earliestStartDate)
-
-                try container.encode(preferredWorkModel, forKey: .preferredWorkModel)
-                try container.encode(homeofficePreference, forKey: .homeofficePreference)
-                try container.encode(desiredHomeofficeDays, forKey: .desiredHomeofficeDays)
-                try container.encode(
-                    preferredHomeofficeSchedule,
-                    forKey: .preferredHomeofficeSchedule
-                )
-                try container.encode(acceptsFullyRemote, forKey: .acceptsFullyRemote)
-                try container.encode(salaryMin, forKey: .salaryMin)
-                try container.encode(salaryMax, forKey: .salaryMax)
-
-                try container.encode(onboardingStep, forKey: .onboardingStep)
-                try container.encode(onboardingCompleted, forKey: .onboardingCompleted)
+                case educationStatus = "education_status"
             }
         }
 
-        let update = Update(
-            region: nil,
-            regionLatitude: nil,
-            regionLongitude: nil,
-            nationality: nil,
-            hasWorkAuthorization: nil,
-            workAuthorizationDetails: nil,
-            desiredWorkloadMin: nil,
-            desiredWorkloadMax: nil,
-            desiredWorkLocation: nil,
-            desiredWorkLatitude: nil,
-            desiredWorkLongitude: nil,
-            workRadiusKm: nil,
-            willingToCommute: nil,
-            willingToRelocate: nil,
-            earliestStartDate: nil,
-            preferredWorkModel: nil,
-            homeofficePreference: nil,
-            desiredHomeofficeDays: nil,
-            preferredHomeofficeSchedule: nil,
-            acceptsFullyRemote: nil,
-            salaryMin: nil,
-            salaryMax: nil,
-            onboardingStep: 0,
-            onboardingCompleted: false
-        )
+        let result: Result = try await client
+            .from("candidate_profiles")
+            .select("education_status")
+            .eq("user_id", value: userId)
+            .single()
+            .execute()
+            .value
+
+        return result.educationStatus
+    }
+
+    func updateEducationStatus(
+        userId: UUID,
+        status: String
+    ) async throws {
+
+        struct Update: Encodable {
+            let educationStatus: String
+
+            enum CodingKeys: String, CodingKey {
+                case educationStatus = "education_status"
+            }
+        }
 
         try await client
             .from("candidate_profiles")
-            .update(update)
+            .update(Update(educationStatus: status))
             .eq("user_id", value: userId)
             .execute()
     }
 
-    func fetchProfile(userId: UUID) async throws -> CandidateProfile {
+    // MARK: - Work Experience Status
+
+    func updateWorkExperienceStatus(
+        userId: UUID,
+        status: String
+    ) async throws {
+
+        struct Update: Encodable {
+            let workExperienceStatus: String
+
+            enum CodingKeys: String, CodingKey {
+                case workExperienceStatus = "work_experience_status"
+            }
+        }
+
+        try await client
+            .from("candidate_profiles")
+            .update(Update(workExperienceStatus: status))
+            .eq("user_id", value: userId)
+            .execute()
+    }
+
+    func fetchWorkExperienceStatus(
+        userId: UUID
+    ) async throws -> String? {
+
+        struct Result: Decodable {
+            let workExperienceStatus: String?
+
+            enum CodingKeys: String, CodingKey {
+                case workExperienceStatus = "work_experience_status"
+            }
+        }
+
+        let result: Result = try await client
+            .from("candidate_profiles")
+            .select("work_experience_status")
+            .eq("user_id", value: userId)
+            .single()
+            .execute()
+            .value
+
+        return result.workExperienceStatus
+    }
+
+    // MARK: - Profile
+
+    func fetchProfile(
+        userId: UUID
+    ) async throws -> CandidateProfile {
+
         try await client
             .from("candidate_profiles")
             .select("""
@@ -171,7 +150,7 @@ final class CandidateProfileRepository {
                 onboarding_completed,
                 preferred_work_model,
                 homeoffice_preference,
-                desired_homeoffice_days,    
+                desired_homeoffice_days,
                 preferred_homeoffice_schedule,
                 accepts_fully_remote,
                 salary_min,
@@ -182,9 +161,9 @@ final class CandidateProfileRepository {
             .execute()
             .value
     }
-    
-    
-    
+
+    // MARK: - Basic Information
+
     func updateBasicInformation(
         userId: UUID,
         region: String,
@@ -194,6 +173,7 @@ final class CandidateProfileRepository {
         hasWorkAuthorization: Bool,
         workAuthorizationDetails: String?
     ) async throws {
+
         struct Update: Encodable {
             let region: String
             let regionLatitude: Double
@@ -201,7 +181,6 @@ final class CandidateProfileRepository {
             let nationality: String
             let hasWorkAuthorization: Bool
             let workAuthorizationDetails: String?
-            let onboardingStep: Int
 
             enum CodingKeys: String, CodingKey {
                 case region
@@ -210,7 +189,6 @@ final class CandidateProfileRepository {
                 case nationality
                 case hasWorkAuthorization = "has_work_authorization"
                 case workAuthorizationDetails = "work_authorization_details"
-                case onboardingStep = "onboarding_step"
             }
         }
 
@@ -220,8 +198,7 @@ final class CandidateProfileRepository {
             regionLongitude: regionLongitude,
             nationality: nationality,
             hasWorkAuthorization: hasWorkAuthorization,
-            workAuthorizationDetails: workAuthorizationDetails,
-            onboardingStep: 1
+            workAuthorizationDetails: workAuthorizationDetails
         )
 
         try await client
@@ -230,11 +207,28 @@ final class CandidateProfileRepository {
             .eq("user_id", value: userId)
             .execute()
     }
-    
+
+    // MARK: - Onboarding Progress
+
     func updateOnboardingStep(
         userId: UUID,
         step: Int
     ) async throws {
+
+        guard (0...9).contains(step) else {
+            throw OnboardingProgressError.invalidStep
+        }
+
+        struct Progress: Decodable {
+            let onboardingStep: Int
+            let onboardingCompleted: Bool
+
+            enum CodingKeys: String, CodingKey {
+                case onboardingStep = "onboarding_step"
+                case onboardingCompleted = "onboarding_completed"
+            }
+        }
+
         struct Update: Encodable {
             let onboardingStep: Int
 
@@ -243,16 +237,38 @@ final class CandidateProfileRepository {
             }
         }
 
+        let progress: Progress = try await client
+            .from("candidate_profiles")
+            .select("onboarding_step, onboarding_completed")
+            .eq("user_id", value: userId)
+            .single()
+            .execute()
+            .value
+
+        guard !progress.onboardingCompleted else {
+            return
+        }
+
+        let nextStep = max(
+            progress.onboardingStep,
+            step
+        )
+
+        guard nextStep > progress.onboardingStep else {
+            return
+        }
+
         try await client
             .from("candidate_profiles")
-            .update(
-                Update(onboardingStep: step)
-            )
+            .update(Update(onboardingStep: nextStep))
             .eq("user_id", value: userId)
+            .eq("onboarding_completed", value: false)
+            .lt("onboarding_step", value: nextStep)
             .execute()
     }
-    
-    
+
+    // MARK: - Job Preferences
+
     func updateJobPreferences(
         userId: UUID,
         desiredWorkloadMin: Int,
@@ -265,6 +281,7 @@ final class CandidateProfileRepository {
         willingToRelocate: Bool,
         earliestStartDate: Date
     ) async throws {
+
         struct Update: Encodable {
             let desiredWorkloadMin: Int
             let desiredWorkloadMax: Int
@@ -275,7 +292,6 @@ final class CandidateProfileRepository {
             let willingToCommute: Bool
             let willingToRelocate: Bool
             let earliestStartDate: String
-            let onboardingStep: Int
 
             enum CodingKeys: String, CodingKey {
                 case desiredWorkloadMin = "desired_workload_min"
@@ -287,7 +303,6 @@ final class CandidateProfileRepository {
                 case willingToCommute = "willing_to_commute"
                 case willingToRelocate = "willing_to_relocate"
                 case earliestStartDate = "earliest_start_date"
-                case onboardingStep = "onboarding_step"
             }
         }
 
@@ -306,8 +321,9 @@ final class CandidateProfileRepository {
             workRadiusKm: workRadiusKm,
             willingToCommute: willingToCommute,
             willingToRelocate: willingToRelocate,
-            earliestStartDate: formatter.string(from: earliestStartDate),
-            onboardingStep: 6
+            earliestStartDate: formatter.string(
+                from: earliestStartDate
+            )
         )
 
         try await client
@@ -315,9 +331,15 @@ final class CandidateProfileRepository {
             .update(update)
             .eq("user_id", value: userId)
             .execute()
+
+        try await updateOnboardingStep(
+            userId: userId,
+            step: 6
+        )
     }
-    
-    
+
+    // MARK: - Work and Salary
+
     func updateWorkAndSalaryPreferences(
         userId: UUID,
         preferredWorkModel: PreferredWorkModel,
@@ -328,6 +350,7 @@ final class CandidateProfileRepository {
         salaryMin: Int,
         salaryMax: Int
     ) async throws {
+
         struct Update: Encodable {
             let preferredWorkModel: PreferredWorkModel
             let homeofficePreference: HomeofficePreference
@@ -336,7 +359,6 @@ final class CandidateProfileRepository {
             let acceptsFullyRemote: Bool
             let salaryMin: Int
             let salaryMax: Int
-            let onboardingStep: Int
 
             enum CodingKeys: String, CodingKey {
                 case preferredWorkModel = "preferred_work_model"
@@ -346,7 +368,6 @@ final class CandidateProfileRepository {
                 case acceptsFullyRemote = "accepts_fully_remote"
                 case salaryMin = "salary_min"
                 case salaryMax = "salary_max"
-                case onboardingStep = "onboarding_step"
             }
         }
 
@@ -357,8 +378,7 @@ final class CandidateProfileRepository {
             preferredHomeofficeSchedule: preferredHomeofficeSchedule,
             acceptsFullyRemote: acceptsFullyRemote,
             salaryMin: salaryMin,
-            salaryMax: salaryMax,
-            onboardingStep: 7
+            salaryMax: salaryMax
         )
 
         try await client
@@ -366,12 +386,19 @@ final class CandidateProfileRepository {
             .update(update)
             .eq("user_id", value: userId)
             .execute()
+
+        try await updateOnboardingStep(
+            userId: userId,
+            step: 7
+        )
     }
-    
-    
+
+    // MARK: - Employer Matching
+
     func fetchEmployerMatchingCandidates(
         jobId: UUID
     ) async throws -> [EmployerCandidateMatchingInput] {
+
         struct Params: Encodable {
             let pJobId: UUID
 
@@ -388,11 +415,13 @@ final class CandidateProfileRepository {
             .execute()
             .value
     }
-    
-    
+
+    // MARK: - Complete Onboarding
+
     func completeOnboarding(
         userId: UUID
     ) async throws {
+
         struct Update: Encodable {
             let onboardingStep: Int
             let onboardingCompleted: Bool
@@ -404,7 +433,7 @@ final class CandidateProfileRepository {
         }
 
         let update = Update(
-            onboardingStep: 8,
+            onboardingStep: 9,
             onboardingCompleted: true
         )
 
@@ -412,9 +441,20 @@ final class CandidateProfileRepository {
             .from("candidate_profiles")
             .update(update)
             .eq("user_id", value: userId)
+            .eq("onboarding_completed", value: false)
             .execute()
     }
+
+    // MARK: - Errors
+
+    private enum OnboardingProgressError: LocalizedError {
+        case invalidStep
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidStep:
+                return "Ungültiger Onboarding-Schritt."
+            }
+        }
+    }
 }
-
-
-

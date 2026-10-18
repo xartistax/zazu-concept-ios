@@ -47,7 +47,20 @@ struct WorkExperienceView: View {
                         .frame(maxWidth: .infinity)
                 } else {
                     experiencesSection
-                    form
+
+                    if mode == .onboarding {
+                        Toggle(
+                            "Ich habe noch keine Berufserfahrung",
+                            isOn: $viewModel.hasNoWorkExperience
+                        )
+                        .tint(ZAZUColors.primary)
+                        .disabled(!viewModel.experiences.isEmpty)
+                    }
+
+                    if !viewModel.hasNoWorkExperience {
+                        form
+                    }
+
                     errorMessage
                     if mode == .onboarding {
                         continueButton
@@ -309,15 +322,11 @@ struct WorkExperienceView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
-        .background(
-            viewModel.experiences.isEmpty
-                ? ZAZUColors.textSecondary.opacity(0.4)
-                : ZAZUColors.primary
-        )
+        .background(ZAZUColors.primary)
         .clipShape(
             RoundedRectangle(cornerRadius: ZAZURadius.medium)
         )
-        .disabled(viewModel.experiences.isEmpty)
+        .disabled(viewModel.isSaving)
     }
 
     private func textField(

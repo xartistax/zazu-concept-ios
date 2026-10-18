@@ -4,6 +4,10 @@
 //
 //  Created by Demian Füglistaler on 28.09.2026.
 //
+//
+//  SkillsViewModel.swift
+//  ZAZU
+//
 
 import Foundation
 import Observation
@@ -12,21 +16,28 @@ import Observation
 @MainActor
 final class SkillsViewModel {
 
+    // MARK: - State
+
     var skills: [Skill] = []
     var candidateSkills: [CandidateSkill] = []
-    
     var candidateCustomSkills: [CandidateCustomSkill] = []
 
     var searchText = ""
     var selectedCategory: String?
 
     var isLoading = false
+    var isSearching = false
     var isSaving = false
     var errorMessage: String?
 
     private let skillRepository: SkillRepository
     private let candidateProfileRepository: CandidateProfileRepository
     private let candidateId: UUID
+
+    private var searchTask: Task<Void, Never>?
+    private var searchGeneration = 0
+
+    // MARK: - Init
 
     init(
         skillRepository: SkillRepository,
@@ -39,45 +50,57 @@ final class SkillsViewModel {
     }
 
     // MARK: - Display
-    
+
     var categories: [String] {
-        Array(
-            Set(
-                skills
-                    .map(\.category)
-                    .filter { !$0.isEmpty }
-            )
-        )
-        .sorted {
-            $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+        [
+            "skill/competence",
+            "knowledge"
+        ]
+    }
+
+    func categoryTitle(_ category: String) -> String {
+        switch category {
+        case "skill/competence":
+            return "Fähigkeiten"
+
+        case "knowledge":
+            return "Fach- & Systemkenntnisse"
+
+        case "unspecified":
+            return "Sonstige"
+
+        default:
+            return category
         }
+    }
+
+    var hasSearchQuery: Bool {
+        searchText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .count >= 2
     }
 
     var filteredSkills: [Skill] {
-        let query = searchText.trimmingCharacters(
-            in: .whitespacesAndNewlines
+        let selectedIds = Set(
+            candidateSkills.map(\.skillId)
         )
 
-        return skills.filter { skill in
-            let matchesSearch =
-                query.isEmpty ||
-                skill.name.localizedCaseInsensitiveContains(query) ||
-                skill.category.localizedCaseInsensitiveContains(query)
-
-            let matchesCategory =
-                selectedCategory == nil ||
-                skill.category == selectedCategory
-
-            return matchesSearch && matchesCategory
+        return skills.filter {
+            !selectedIds.contains($0.id)
         }
     }
+
     var selectedSkills: [Skill] {
-        skills.filter { skill in
-            candidateSkills.contains {
-                $0.skillId == skill.id
-            }
+        let selectedIds = Set(
+            candidateSkills.map(\.skillId)
+        )
+
+        return selectedSkillDetails.filter {
+            selectedIds.contains($0.id)
         }
     }
+
+    private var selectedSkillDetails: [Skill] = []
 
     func proficiency(
         for skill: Skill
@@ -108,8 +131,6 @@ final class SkillsViewModel {
         }
 
         do {
-            async let skillsRequest = skillRepository.fetchSkills()
-
             async let candidateSkillsRequest =
                 skillRepository.fetchCandidateSkills(
                     candidateId: candidateId
@@ -121,20 +142,77 @@ final class SkillsViewModel {
                 )
 
             let (
-                loadedSkills,
                 loadedCandidateSkills,
                 loadedCustomSkills
             ) = try await (
-                skillsRequest,
                 candidateSkillsRequest,
                 customSkillsRequest
             )
 
-            skills = loadedSkills
             candidateSkills = loadedCandidateSkills
             candidateCustomSkills = loadedCustomSkills
+
+            await reloadSelectedSkillDetails()
+
+            scheduleSearch()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Search
+
+    func scheduleSearch() {
+        searchTask?.cancel()
+        searchGeneration += 1
+
+        let generation = searchGeneration
+
+        skills = []
+
+        guard hasSearchQuery else {
+            isSearching = false
+            return
+        }
+
+        isSearching = true
+
+        let query = searchText
+        let category = selectedCategory
+
+        searchTask = Task {
+            do {
+                try await Task.sleep(
+                    for: .milliseconds(300)
+                )
+
+                try Task.checkCancellation()
+
+                let results = try await skillRepository.searchSkills(
+                    query: query,
+                    category: category
+                )
+
+                guard !Task.isCancelled,
+                      generation == searchGeneration else {
+                    return
+                }
+
+                skills = results
+                isSearching = false
+
+            } catch is CancellationError {
+                return
+
+            } catch {
+                guard generation == searchGeneration else {
+                    return
+                }
+
+                skills = []
+                isSearching = false
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -163,6 +241,8 @@ final class SkillsViewModel {
             )
 
             await reloadCandidateSkills()
+            await reloadSelectedSkillDetails()
+
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -191,23 +271,30 @@ final class SkillsViewModel {
             candidateSkills.removeAll {
                 $0.skillId == skill.id
             }
+
+            selectedSkillDetails.removeAll {
+                $0.id == skill.id
+            }
+
         } catch {
             errorMessage = error.localizedDescription
         }
     }
-    
+
     // MARK: - Custom Skills
 
     func saveCustomSkill(
         name: String,
         proficiency: SkillProficiency
     ) async -> Bool {
+
         let trimmedName = name.trimmingCharacters(
             in: .whitespacesAndNewlines
         )
 
         guard !trimmedName.isEmpty else {
-            errorMessage = "Gib einen Skill oder eine Systemkenntnis ein."
+            errorMessage =
+                "Gib einen Skill oder eine Systemkenntnis ein."
             return false
         }
 
@@ -231,6 +318,7 @@ final class SkillsViewModel {
 
             await reloadCandidateCustomSkills()
             return true
+
         } catch {
             errorMessage = error.localizedDescription
             return false
@@ -259,6 +347,7 @@ final class SkillsViewModel {
             candidateCustomSkills.removeAll {
                 $0.id == skill.id
             }
+
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -267,8 +356,11 @@ final class SkillsViewModel {
     // MARK: - Onboarding
 
     func completeStep() async -> Bool {
-        guard !candidateSkills.isEmpty || !candidateCustomSkills.isEmpty else {
-            errorMessage = "Wähle mindestens einen Skill oder eine Systemkenntnis aus."
+        guard !candidateSkills.isEmpty ||
+              !candidateCustomSkills.isEmpty else {
+
+            errorMessage =
+                "Wähle mindestens einen Skill oder eine Systemkenntnis aus."
             return false
         }
 
@@ -277,10 +369,11 @@ final class SkillsViewModel {
         do {
             try await candidateProfileRepository.updateOnboardingStep(
                 userId: candidateId,
-                step: 3
+                step: 4
             )
 
             return true
+
         } catch {
             errorMessage = error.localizedDescription
             return false
@@ -291,20 +384,35 @@ final class SkillsViewModel {
 
     private func reloadCandidateSkills() async {
         do {
-            candidateSkills = try await skillRepository.fetchCandidateSkills(
-                candidateId: candidateId
-            )
+            candidateSkills =
+                try await skillRepository.fetchCandidateSkills(
+                    candidateId: candidateId
+                )
+
         } catch {
             errorMessage = error.localizedDescription
         }
     }
-    
+
+    private func reloadSelectedSkillDetails() async {
+        do {
+            let ids = candidateSkills.map(\.skillId)
+
+            selectedSkillDetails =
+                try await skillRepository.fetchSkillsByIds(ids)
+
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     private func reloadCandidateCustomSkills() async {
         do {
             candidateCustomSkills =
                 try await skillRepository.fetchCandidateCustomSkills(
                     candidateId: candidateId
                 )
+
         } catch {
             errorMessage = error.localizedDescription
         }

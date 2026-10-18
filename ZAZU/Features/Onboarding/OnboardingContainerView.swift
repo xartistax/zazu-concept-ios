@@ -74,9 +74,9 @@ struct OnboardingContainerView: View {
             )
 
         case 1:
-            WorkExperienceView(
-                viewModel: WorkExperienceViewModel(
-                    workExperienceRepository: workExperienceRepository,
+            EducationView(
+                viewModel: EducationViewModel(
+                    educationRepository: educationRepository,
                     candidateProfileRepository: candidateProfileRepository,
                     candidateId: userId
                 ),
@@ -86,9 +86,9 @@ struct OnboardingContainerView: View {
             )
 
         case 2:
-            SkillsView(
-                viewModel: SkillsViewModel(
-                    skillRepository: skillRepository,
+            WorkExperienceView(
+                viewModel: WorkExperienceViewModel(
+                    workExperienceRepository: workExperienceRepository,
                     candidateProfileRepository: candidateProfileRepository,
                     candidateId: userId
                 ),
@@ -98,9 +98,9 @@ struct OnboardingContainerView: View {
             )
 
         case 3:
-            EducationView(
-                viewModel: EducationViewModel(
-                    educationRepository: educationRepository,
+            SkillsView(
+                viewModel: SkillsViewModel(
+                    skillRepository: skillRepository,
                     candidateProfileRepository: candidateProfileRepository,
                     candidateId: userId
                 ),
@@ -158,8 +158,7 @@ struct OnboardingContainerView: View {
                     appState.rootState = .main
                 }
             )
-            
-            
+
         default:
             nextStepPlaceholder
         }

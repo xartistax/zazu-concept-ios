@@ -45,7 +45,20 @@ struct EducationView: View {
                     loadingView
                 } else {
                     educationList
-                    form
+
+                    if mode == .onboarding {
+                        Toggle(
+                            "Ich habe keinen formalen Bildungsabschluss",
+                            isOn: $viewModel.hasNoFormalQualification
+                        )
+                        .tint(ZAZUColors.primary)
+                        .disabled(!viewModel.educations.isEmpty)
+                    }
+
+                    if !viewModel.hasNoFormalQualification {
+                        form
+                    }
+
                     errorMessage
 
                     if mode == .onboarding {
@@ -197,11 +210,35 @@ struct EducationView: View {
                 "Institution / Schule",
                 text: $viewModel.institutionName
             )
+            
+            Picker("Ausbildungsniveau", selection: $viewModel.educationLevel) {
+                Text("Obligatorische Schule").tag("compulsory_school")
+                Text("Berufsattest (EBA)").tag("eba")
+                Text("Berufslehre (EFZ)").tag("efz")
+                Text("Berufsmaturität").tag("vocational_baccalaureate")
+                Text("Fachmittelschule").tag("specialised_school")
+                Text("Fachmaturität").tag("specialised_baccalaureate")
+                Text("Eidg. Fachausweis").tag("federal_professional_exam")
+                Text("Eidg. Diplom").tag("higher_professional_exam")
+                Text("Höhere Fachschule (HF)").tag("higher_technical_college")
+                Text("Bachelor").tag("bachelor")
+                Text("Master").tag("master")
+                Text("Doktorat / PhD").tag("doctorate")
+                Text("CAS").tag("cas")
+                Text("DAS").tag("das")
+                Text("MAS").tag("mas")
+                Text("Andere Qualifikation").tag("other")
+            }
+            .pickerStyle(.menu)
+            .tint(ZAZUColors.primary)
+            .onChange(of: viewModel.educationLevel) { _, _ in
+                viewModel.selectedQualification = nil
+                viewModel.degree = ""
+                viewModel.qualificationSearchText = ""
+                viewModel.qualifications = []
+            }
 
-            textField(
-                "Abschluss / Qualifikation",
-                text: $viewModel.degree
-            )
+            qualificationSelection
 
             textField(
                 "Fachrichtung (optional)",
@@ -210,11 +247,15 @@ struct EducationView: View {
 
             startDateSection
 
-            Toggle(
-                "Läuft aktuell",
-                isOn: $viewModel.isCurrent
-            )
-            .tint(ZAZUColors.primary)
+            Picker("Ausbildungsstatus", selection: $viewModel.completionStatus) {
+                Text("Abgeschlossen").tag("completed")
+                Text("In Ausbildung").tag("in_progress")
+                Text("Nicht abgeschlossen").tag("not_completed")
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: viewModel.completionStatus) { _, newValue in
+                viewModel.isCurrent = newValue == "in_progress"
+            }
 
             if !viewModel.isCurrent {
                 endDateSection
@@ -248,6 +289,92 @@ struct EducationView: View {
                     selection: $viewModel.startDate,
                     displayedComponents: .date
                 )
+            }
+        }
+    }
+    
+    private var qualificationSelection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: ZAZUSpacing.small
+        ) {
+            Text("Abschluss / Qualifikation")
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(ZAZUColors.textPrimary)
+
+            TextField(
+                "Abschluss suchen, z. B. Informatiker",
+                text: $viewModel.qualificationSearchText
+            )
+            .padding(ZAZUSpacing.medium)
+            .background(ZAZUColors.veryLightPurple)
+            .clipShape(
+                RoundedRectangle(cornerRadius: ZAZURadius.medium)
+            )
+            .autocorrectionDisabled()
+            .task(
+                id: "\(viewModel.educationLevel)|\(viewModel.qualificationSearchText)"
+            ) {
+                do {
+                    try await Task.sleep(for: .milliseconds(300))
+                    try Task.checkCancellation()
+                    await viewModel.searchQualifications()
+                } catch is CancellationError {
+                    // Eine neuere Suche hat diese ersetzt.
+                } catch {
+                    // Fehler werden im ViewModel behandelt.
+                }
+            }
+
+            if let selected = viewModel.selectedQualification {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(ZAZUColors.primary)
+
+                    Text(selected.name)
+                        .fontWeight(.medium)
+
+                    Spacer()
+
+                    Button {
+                        viewModel.selectedQualification = nil
+                        viewModel.degree = ""
+                        viewModel.qualificationSearchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(ZAZUColors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(ZAZUSpacing.small)
+            }
+
+            if viewModel.isLoadingQualifications {
+                ProgressView()
+                    .tint(ZAZUColors.primary)
+            } else if viewModel.selectedQualification == nil {
+                ForEach(viewModel.qualifications) { qualification in
+                    Button {
+                        viewModel.selectQualification(qualification)
+                    } label: {
+                        HStack {
+                            Text(qualification.name)
+                                .foregroundStyle(ZAZUColors.textPrimary)
+
+                            Spacer()
+
+                            Image(systemName: "plus.circle")
+                                .foregroundStyle(ZAZUColors.primary)
+                        }
+                        .padding(ZAZUSpacing.medium)
+                        .background(ZAZUColors.veryLightPurple)
+                        .clipShape(
+                            RoundedRectangle(cornerRadius: ZAZURadius.medium)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }
@@ -338,9 +465,7 @@ struct EducationView: View {
             }
         } label: {
             Text(
-                viewModel.educations.isEmpty
-                    ? "Ohne Eintrag weiter"
-                    : "Weiter"
+                "Weiter"
             )
             .fontWeight(.semibold)
             .frame(maxWidth: .infinity)

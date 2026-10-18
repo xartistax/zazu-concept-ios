@@ -17,6 +17,13 @@ final class EducationViewModel {
     var institutionName = ""
     var degree = ""
     var fieldOfStudy = ""
+    var educationLevel = "other"
+    var completionStatus = "completed"
+    var qualificationSearchText = ""
+    var qualifications: [EducationQualification] = []
+    var selectedQualification: EducationQualification?
+
+    var isLoadingQualifications = false
 
     var startDate = Date()
     var endDate = Date()
@@ -29,6 +36,8 @@ final class EducationViewModel {
     var isLoading = false
     var isSaving = false
     var errorMessage: String?
+    
+    var hasNoFormalQualification = false
 
     private let educationRepository: EducationRepository
     private let candidateProfileRepository: CandidateProfileRepository
@@ -51,9 +60,7 @@ final class EducationViewModel {
             !institutionName
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .isEmpty &&
-            !degree
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .isEmpty
+            selectedQualification != nil
 
         guard hasRequiredFields, !isSaving else {
             return false
@@ -88,6 +95,16 @@ final class EducationViewModel {
             educations = try await educationRepository.fetchAll(
                 candidateId: candidateId
             )
+
+            let educationStatus =
+                try await candidateProfileRepository.fetchEducationStatus(
+                    userId: candidateId
+                )
+
+            hasNoFormalQualification =
+                educationStatus == "no_formal_qualification"
+                && educations.isEmpty
+
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -116,7 +133,10 @@ final class EducationViewModel {
                 startDate: hasStartDate ? startDate : nil,
                 endDate: normalizedEndDate,
                 isCurrent: isCurrent,
-                description: normalizedOptional(description)
+                description: normalizedOptional(description),
+                educationLevel: educationLevel,
+                completionStatus: isCurrent ? "in_progress" : completionStatus,
+                qualificationId: selectedQualification?.id
             )
 
             educations = try await educationRepository.fetchAll(
@@ -157,7 +177,28 @@ final class EducationViewModel {
     func completeStep() async -> Bool {
         errorMessage = nil
 
+        guard !educations.isEmpty || hasNoFormalQualification else {
+            errorMessage = """
+            Bitte füge eine Ausbildung hinzu oder wähle \
+            «Ich habe keinen formalen Bildungsabschluss».
+            """
+            return false
+        }
+
+        let status: String
+
+        if !educations.isEmpty {
+            status = "has_education"
+        } else {
+            status = "no_formal_qualification"
+        }
+
         do {
+            try await candidateProfileRepository.updateEducationStatus(
+                userId: candidateId,
+                status: status
+            )
+
             try await candidateProfileRepository.updateOnboardingStep(
                 userId: candidateId,
                 step: 4
@@ -168,6 +209,35 @@ final class EducationViewModel {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+    
+    func searchQualifications() async {
+        isLoadingQualifications = true
+        errorMessage = nil
+
+        defer {
+            isLoadingQualifications = false
+        }
+
+        do {
+            qualifications = try await educationRepository.searchQualifications(
+                educationLevel: educationLevel,
+                searchText: qualificationSearchText
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+    
+    
+    func selectQualification(_ qualification: EducationQualification) {
+        guard qualification.educationLevel == educationLevel else {
+            return
+        }
+
+        selectedQualification = qualification
+        degree = qualification.name
+        qualificationSearchText = qualification.name
     }
 
     // MARK: - Normalization
@@ -208,6 +278,11 @@ final class EducationViewModel {
         institutionName = ""
         degree = ""
         fieldOfStudy = ""
+        educationLevel = "other"
+        completionStatus = "completed"
+        qualificationSearchText = ""
+        qualifications = []
+        selectedQualification = nil
 
         startDate = Date()
         endDate = Date()

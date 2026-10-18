@@ -11,6 +11,10 @@ import Supabase
 struct EmployerJobFormView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel: EmployerJobFormViewModel
+    
+    @State private var descriptionText = NSAttributedString(string: "")
+    @State private var editorState = JobRichTextEditorState()
+    @State private var didInitializeDescription = false
 
     private let skillRepository: SkillRepository
     private let languageRepository: LanguageRepository
@@ -49,12 +53,27 @@ struct EmployerJobFormView: View {
             Section("Job") {
                 TextField("Jobtitel", text: $viewModel.title)
 
-                TextField(
-                    "Beschreibung",
-                    text: $viewModel.description,
-                    axis: .vertical
-                )
-                .lineLimit(4...8)
+                VStack(alignment: .leading, spacing: ZAZUSpacing.small) {
+                    Text("Beschreibung")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(ZAZUColors.textPrimary)
+
+                    JobRichTextToolbar(
+                        editorState: editorState
+                    )
+
+                    JobRichTextEditor(
+                        attributedText: $descriptionText,
+                        editorState: editorState
+                    )
+                    .frame(minHeight: 220)
+                    .padding(ZAZUSpacing.small)
+                    .background(ZAZUColors.veryLightPurple)
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: ZAZURadius.medium)
+                    )
+                }
 
                 TextField(
                     "Tätigkeitsbereich",
@@ -333,6 +352,10 @@ struct EmployerJobFormView: View {
             Section {
                 Button {
                     Task {
+                        viewModel.description = JobDescriptionHTML.html(
+                            from: descriptionText
+                        )
+
                         if await viewModel.saveJob() {
                             dismiss()
                         }
@@ -355,7 +378,10 @@ struct EmployerJobFormView: View {
                         Spacer()
                     }
                 }
-                .disabled(!viewModel.canSubmit)
+                .disabled(
+                    !viewModel.canSubmit &&
+                    !canSubmitRichText
+                )
             }
         }
         .navigationTitle(
@@ -365,12 +391,38 @@ struct EmployerJobFormView: View {
         )
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            initializeDescription()
             async let contacts: Void = viewModel.loadContacts()
             async let requirements: Void = viewModel.loadRequirementsForEditing()
 
             _ = await (contacts, requirements)
         }
 
+    }
+    
+    private var canSubmitRichText: Bool {
+        !viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !descriptionText.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !viewModel.location.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        viewModel.workloadMin > 0 &&
+        viewModel.workloadMax <= 100 &&
+        viewModel.workloadMin <= viewModel.workloadMax &&
+        !viewModel.isLoading
+    }
+    
+    private func initializeDescription() {
+        guard !didInitializeDescription else { return }
+        didInitializeDescription = true
+
+        let existingDescription = viewModel.description
+
+        if existingDescription.isEmpty {
+            descriptionText = NSAttributedString(string: "")
+        } else {
+            descriptionText = JobDescriptionHTML.attributedString(
+                from: existingDescription
+            )
+        }
     }
 
     @ViewBuilder
