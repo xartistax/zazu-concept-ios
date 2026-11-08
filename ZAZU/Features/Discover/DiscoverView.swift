@@ -950,7 +950,7 @@ struct DiscoverView: View {
             "Keine Jobs verfügbar",
             systemImage: "briefcase",
             description: Text(
-                "Du hast aktuell alle verfügbaren Stellen bewertet."
+                "Aktuell gibt es keine unbewerteten Stellen, deren Muss-Kriterien du vollständig erfüllst."
             )
         )
     }

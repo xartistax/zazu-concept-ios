@@ -29,6 +29,8 @@ final class WorkExperienceViewModel {
     var isSaving = false
     var errorMessage: String?
     
+    private var hasLoaded = false
+    
     
 
     private let workExperienceRepository: WorkExperienceRepository
@@ -53,9 +55,9 @@ final class WorkExperienceViewModel {
     }
 
     func load() async {
-        guard !isLoading else {
-            return
-        }
+        guard !isLoading, !hasLoaded else {
+                    return
+                }
 
         isLoading = true
         errorMessage = nil
@@ -74,6 +76,8 @@ final class WorkExperienceViewModel {
 
             hasNoWorkExperience =
                 status == "no_experience" && experiences.isEmpty
+            
+            hasLoaded = true
 
         } catch {
             errorMessage = error.localizedDescription

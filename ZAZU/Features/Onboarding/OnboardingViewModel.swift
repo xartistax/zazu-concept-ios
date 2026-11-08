@@ -24,6 +24,9 @@ final class OnboardingViewModel {
     var firstName = ""
     var lastName = ""
     var phoneNumber = ""
+    
+    var isNavigating = false
+    var navigationErrorMessage: String?
 
     private let profileRepository: ProfileRepository
     private let repository: CandidateProfileRepository
@@ -110,6 +113,34 @@ final class OnboardingViewModel {
 
         isInitialLoading = false
     }
+    
+    func goBack() async {
+        guard currentStep > 0,
+              !isNavigating else {
+            return
+        }
+
+        let previousStep = currentStep - 1
+
+        isNavigating = true
+        navigationErrorMessage = nil
+
+        defer {
+            isNavigating = false
+        }
+
+        do {
+            try await repository.saveOnboardingCurrentStep(
+                userId: userId,
+                step: previousStep
+            )
+
+            currentStep = previousStep
+        } catch {
+            navigationErrorMessage =
+                "Zurückgehen konnte nicht gespeichert werden. Bitte versuche es erneut."
+        }
+    }
 
     func saveBasicInformation() async -> Bool {
         guard canContinue else {
@@ -147,7 +178,12 @@ final class OnboardingViewModel {
                 workAuthorizationDetails: normalizedWorkAuthorizationDetails
             )
 
-            currentStep = max(currentStep, 1)
+            try await repository.updateOnboardingStep(
+                userId: userId,
+                step: 1
+            )
+
+            currentStep = 1
 
             return true
 

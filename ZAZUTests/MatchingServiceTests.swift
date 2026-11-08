@@ -867,6 +867,8 @@ struct MatchingServiceTests {
             candidateId: UUID(),
             institutionName: "ZHAW",
             degree: "Bachelor",
+            educationLevel: nil,
+            completionStatus: "completed",
             fieldOfStudy: "Informatik",
             startDate: nil,
             endDate: nil,
@@ -984,6 +986,8 @@ struct MatchingServiceTests {
         CandidateProfile(
             userId: UUID(),
             region: "Zürich",
+            regionLatitude: 47.3769,
+            regionLongitude: 8.5417,
             nationality: "Schweiz",
             hasWorkAuthorization: hasWorkAuthorization,
             workAuthorizationDetails: nil,
@@ -1048,7 +1052,8 @@ struct MatchingServiceTests {
             homeofficeSchedule: homeofficeSchedule,
             fullyRemoteAvailable: false,
             homeofficeRequirementType: homeofficeRequirementType,
-            workModelRequirementType: .optional
+            workModelRequirementType: .optional,
+            responsibleContactId: nil
         )
     }
 

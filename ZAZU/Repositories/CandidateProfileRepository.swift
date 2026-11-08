@@ -6,6 +6,7 @@
 //
 //  Created by Demian Füglistaler on 28.09.2026.
 //
+ 
 
 import Foundation
 import Supabase
@@ -20,9 +21,9 @@ final class CandidateProfileRepository {
 
     // MARK: - Reset
 
-    /// Setzt das Onboarding des angemeldeten Testkontos vollständig zurück.
+    /// Setzt das Onboarding des angemeldeten Testkontos zurück.
     /// Die PostgreSQL-Funktion verwendet auth.uid().
-    /// Der Parameter userId bleibt für bestehende Aufrufstellen erhalten.
+    /// userId bleibt für bestehende Aufrufstellen erhalten.
     func resetForPoC(
         userId: UUID
     ) async throws {
@@ -36,7 +37,6 @@ final class CandidateProfileRepository {
     func fetchEducationStatus(
         userId: UUID
     ) async throws -> String? {
-
         struct Result: Decodable {
             let educationStatus: String?
 
@@ -60,7 +60,6 @@ final class CandidateProfileRepository {
         userId: UUID,
         status: String
     ) async throws {
-
         struct Update: Encodable {
             let educationStatus: String
 
@@ -82,7 +81,6 @@ final class CandidateProfileRepository {
         userId: UUID,
         status: String
     ) async throws {
-
         struct Update: Encodable {
             let workExperienceStatus: String
 
@@ -101,7 +99,6 @@ final class CandidateProfileRepository {
     func fetchWorkExperienceStatus(
         userId: UUID
     ) async throws -> String? {
-
         struct Result: Decodable {
             let workExperienceStatus: String?
 
@@ -126,7 +123,6 @@ final class CandidateProfileRepository {
     func fetchProfile(
         userId: UUID
     ) async throws -> CandidateProfile {
-
         try await client
             .from("candidate_profiles")
             .select("""
@@ -155,7 +151,7 @@ final class CandidateProfileRepository {
                 accepts_fully_remote,
                 salary_min,
                 salary_max
-            """)
+                """)
             .eq("user_id", value: userId)
             .single()
             .execute()
@@ -173,7 +169,6 @@ final class CandidateProfileRepository {
         hasWorkAuthorization: Bool,
         workAuthorizationDetails: String?
     ) async throws {
-
         struct Update: Encodable {
             let region: String
             let regionLatitude: Double
@@ -214,7 +209,6 @@ final class CandidateProfileRepository {
         userId: UUID,
         step: Int
     ) async throws {
-
         guard (0...9).contains(step) else {
             throw OnboardingProgressError.invalidStep
         }
@@ -266,6 +260,32 @@ final class CandidateProfileRepository {
             .lt("onboarding_step", value: nextStep)
             .execute()
     }
+    
+    // MARK: - Onboarding Navigation
+
+    func saveOnboardingCurrentStep(
+        userId: UUID,
+        step: Int
+    ) async throws {
+        guard (0...7).contains(step) else {
+            throw OnboardingProgressError.invalidStep
+        }
+
+        struct Update: Encodable {
+            let onboardingStep: Int
+
+            enum CodingKeys: String, CodingKey {
+                case onboardingStep = "onboarding_step"
+            }
+        }
+
+        try await client
+            .from("candidate_profiles")
+            .update(Update(onboardingStep: step))
+            .eq("user_id", value: userId)
+            .eq("onboarding_completed", value: false)
+            .execute()
+    }
 
     // MARK: - Job Preferences
 
@@ -281,7 +301,6 @@ final class CandidateProfileRepository {
         willingToRelocate: Bool,
         earliestStartDate: Date
     ) async throws {
-
         struct Update: Encodable {
             let desiredWorkloadMin: Int
             let desiredWorkloadMax: Int
@@ -350,7 +369,6 @@ final class CandidateProfileRepository {
         salaryMin: Int,
         salaryMax: Int
     ) async throws {
-
         struct Update: Encodable {
             let preferredWorkModel: PreferredWorkModel
             let homeofficePreference: HomeofficePreference
@@ -398,7 +416,6 @@ final class CandidateProfileRepository {
     func fetchEmployerMatchingCandidates(
         jobId: UUID
     ) async throws -> [EmployerCandidateMatchingInput] {
-
         struct Params: Encodable {
             let pJobId: UUID
 
@@ -421,7 +438,6 @@ final class CandidateProfileRepository {
     func completeOnboarding(
         userId: UUID
     ) async throws {
-
         struct Update: Encodable {
             let onboardingStep: Int
             let onboardingCompleted: Bool

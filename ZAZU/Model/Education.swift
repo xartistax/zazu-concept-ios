@@ -13,6 +13,10 @@ struct Education: Identifiable, Decodable, Sendable {
 
     let institutionName: String
     let degree: String
+    
+    let qualificationId: UUID?
+    let qualification: EducationQualification?
+    
     let educationLevel: String?
     let completionStatus: String?
     let fieldOfStudy: String?
@@ -35,5 +39,7 @@ struct Education: Identifiable, Decodable, Sendable {
         case endDate = "end_date"
         case isCurrent = "is_current"
         case description
+        case qualificationId = "qualification_id"
+        case qualification
     }
 }

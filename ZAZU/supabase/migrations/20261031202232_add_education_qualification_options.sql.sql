@@ -1,0 +1,62 @@
+
+begin;
+
+create table public.education_qualification_options (
+    id uuid primary key default gen_random_uuid(),
+
+    qualification_id uuid not null
+        references public.education_qualifications(id)
+        on delete cascade,
+
+    education_type_degree_id uuid not null
+        references public.education_type_degrees(id)
+        on delete cascade,
+
+    education_field_id uuid
+        references public.education_fields(id)
+        on delete cascade,
+
+    institution_id uuid
+        references public.education_institutions(id)
+        on delete cascade,
+
+    created_at timestamptz not null default now()
+);
+
+create index education_qualification_options_degree_idx
+    on public.education_qualification_options(
+        education_type_degree_id
+    );
+
+alter table public.education_qualification_options
+    enable row level security;
+
+revoke all on table public.education_qualification_options
+    from public, anon, authenticated;
+
+grant select on table public.education_qualification_options
+    to authenticated;
+
+create policy "Read active education title options"
+on public.education_qualification_options
+for select
+to authenticated
+using (
+    exists (
+        select 1
+        from public.education_qualifications q
+        where q.id = qualification_id
+          and q.is_active = true
+    )
+);
+
+grant select on table public.education_qualifications
+    to authenticated;
+
+create policy "Read active education qualifications"
+on public.education_qualifications
+for select
+to authenticated
+using (is_active = true);
+
+commit;

@@ -917,16 +917,7 @@ struct ProfileView: View {
     private func skillLevelText(
         _ proficiency: SkillProficiency
     ) -> String {
-        switch proficiency {
-        case .basic:
-            return "Grundkenntnisse"
-        case .good:
-            return "Gut"
-        case .veryGood:
-            return "Sehr gut"
-        case .expert:
-            return "Experte"
-        }
+        proficiency.title
     }
     
     @MainActor

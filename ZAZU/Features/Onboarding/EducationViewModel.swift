@@ -13,6 +13,33 @@ import Observation
 final class EducationViewModel {
 
     var educations: [Education] = []
+    
+    
+    // MARK: - Education Catalog
+
+    var educationTypes: [EducationType] = []
+    var educationTypeDegrees: [EducationTypeDegree] = []
+    var educationFields: [EducationField] = []
+    var educationInstitutionTypes: [EducationInstitutionType] = []
+    var educationInstitutions: [EducationInstitution] = []
+
+    var selectedEducationType: EducationType?
+    var selectedEducationTypeDegree: EducationTypeDegree?
+    var selectedEducationField: EducationField?
+    var selectedInstitutionType: EducationInstitutionType?
+    var selectedInstitution: EducationInstitution?
+
+    var educationFieldSearchText = ""
+    var institutionSearchText = ""
+
+    var isLoadingCatalog = false
+    var isLoadingDegrees = false
+    var isLoadingFields = false
+    var isLoadingInstitutions = false
+
+    var catalogErrorMessage: String?
+
+    
 
     var institutionName = ""
     var degree = ""
@@ -42,6 +69,9 @@ final class EducationViewModel {
     private let educationRepository: EducationRepository
     private let candidateProfileRepository: CandidateProfileRepository
     private let candidateId: UUID
+    private var hasLoaded = false
+    private var qualificationRequestID = UUID()
+    private var loadedQualificationContextID: String?
 
     init(
         educationRepository: EducationRepository,
@@ -55,32 +85,76 @@ final class EducationViewModel {
 
     // MARK: - Validation
 
+    
+    
     var canSaveEducation: Bool {
-        let hasRequiredFields =
-            !institutionName
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .isEmpty &&
-            selectedQualification != nil
-
-        guard hasRequiredFields, !isSaving else {
+        guard !isSaving, !isLoadingQualifications else {
             return false
         }
 
-        guard
-            hasStartDate,
-            !isCurrent,
-            hasEndDate
-        else {
-            return true
+        if let selectedQualification {
+            guard loadedQualificationContextID == qualificationContextID,
+                  qualifications.contains(
+                      where: { $0.id == selectedQualification.id }
+                  )
+            else {
+                return false
+            }
         }
 
-        return endDate >= startDate
+        guard let selectedEducationType,
+              let selectedDegree = selectedEducationTypeDegree,
+              selectedDegree.educationTypeId == selectedEducationType.id
+        else {
+            return false
+        }
+
+        let isHigherEducation =
+            selectedEducationType.code == "A01"
+            || selectedEducationType.code == "A10"
+
+        if isHigherEducation {
+            guard let selectedInstitution,
+                  educationInstitutions.contains(
+                      where: { $0.id == selectedInstitution.id }
+                  )
+            else {
+                return false
+            }
+        } else {
+            guard !institutionName
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .isEmpty
+            else {
+                return false
+            }
+        }
+
+        if hasStartDate && !isCurrent && hasEndDate {
+            guard endDate >= startDate else {
+                return false
+            }
+        }
+        
+        if selectedEducationType.code == "A01" {
+            guard let selectedEducationField,
+                  educationFields.contains(
+                      where: { $0.id == selectedEducationField.id }
+                  )
+            else {
+                return false
+            }
+        }
+
+        return true
     }
+
+
 
     // MARK: - Loading
 
     func load() async {
-        guard !isLoading else {
+        guard !isLoading, !hasLoaded else {
             return
         }
 
@@ -104,16 +178,24 @@ final class EducationViewModel {
             hasNoFormalQualification =
                 educationStatus == "no_formal_qualification"
                 && educations.isEmpty
+            hasLoaded = true
 
         } catch {
             errorMessage = error.localizedDescription
         }
+        
+        await loadEducationCatalog()
+        
     }
 
     // MARK: - Create
 
+    
     func addEducation() async -> Bool {
-        guard canSaveEducation else {
+        guard canSaveEducation,
+              let selectedEducationType,
+              let selectedEducationTypeDegree
+        else {
             return false
         }
 
@@ -128,29 +210,43 @@ final class EducationViewModel {
             try await educationRepository.create(
                 candidateId: candidateId,
                 institutionName: normalizedInstitutionName,
-                degree: normalizedDegree,
+                degree: selectedEducationTypeDegree.nameDe,
                 fieldOfStudy: normalizedOptional(fieldOfStudy),
                 startDate: hasStartDate ? startDate : nil,
                 endDate: normalizedEndDate,
                 isCurrent: isCurrent,
                 description: normalizedOptional(description),
-                educationLevel: educationLevel,
-                completionStatus: isCurrent ? "in_progress" : completionStatus,
-                qualificationId: selectedQualification?.id
+                educationLevel: nil,
+                completionStatus: isCurrent
+                    ? "in_progress"
+                    : completionStatus,
+                qualificationId: selectedQualification?.id,
+                educationTypeId: selectedEducationType.id,
+                educationTypeDegreeId: selectedEducationTypeDegree.id,
+                educationFieldId: selectedEducationField?.id,
+                institutionTypeId: selectedInstitutionType?.id,
+                institutionId: selectedInstitution?.id
             )
 
             educations = try await educationRepository.fetchAll(
                 candidateId: candidateId
             )
+            
+            hasNoFormalQualification = false
+
+            try await candidateProfileRepository.updateEducationStatus(
+                userId: candidateId,
+                status: "has_education"
+            )
 
             resetForm()
-
             return true
         } catch {
             errorMessage = error.localizedDescription
             return false
         }
     }
+
 
     // MARK: - Delete
 
@@ -201,7 +297,7 @@ final class EducationViewModel {
 
             try await candidateProfileRepository.updateOnboardingStep(
                 userId: candidateId,
-                step: 4
+                step: 2
             )
 
             return true
@@ -211,34 +307,287 @@ final class EducationViewModel {
         }
     }
     
-    func searchQualifications() async {
+    var qualificationContextID: String {
+        [
+            selectedEducationTypeDegree?.id.uuidString ?? "",
+            selectedEducationField?.id.uuidString ?? "",
+            selectedInstitution?.id.uuidString ?? ""
+        ]
+        .joined(separator: ":")
+    }
+
+    func loadQualificationOptions() async {
+        let requestID = UUID()
+        qualificationRequestID = requestID
+
+        let contextID = qualificationContextID
+        loadedQualificationContextID = nil
+
+        selectedQualification = nil
+        qualifications = []
+        qualificationSearchText = ""
+
+        guard let degreeID = selectedEducationTypeDegree?.id else {
+            isLoadingQualifications = false
+            return
+        }
+
         isLoadingQualifications = true
-        errorMessage = nil
+        catalogErrorMessage = nil
 
         defer {
-            isLoadingQualifications = false
+            if qualificationRequestID == requestID {
+                isLoadingQualifications = false
+            }
         }
 
         do {
-            qualifications = try await educationRepository.searchQualifications(
-                educationLevel: educationLevel,
-                searchText: qualificationSearchText
-            )
+            let options =
+                try await educationRepository.fetchQualificationOptions(
+                    degreeId: degreeID,
+                    fieldId: selectedEducationField?.id,
+                    institutionId: selectedInstitution?.id
+                )
+
+            guard qualificationRequestID == requestID,
+                  qualificationContextID == contextID,
+                  !Task.isCancelled else {
+                return
+            }
+
+            loadedQualificationContextID = contextID
+            qualifications = options
         } catch {
-            errorMessage = error.localizedDescription
+            guard qualificationRequestID == requestID,
+                  qualificationContextID == contextID,
+                  !Task.isCancelled else {
+                return
+            }
+
+            catalogErrorMessage =
+                "Abschlusstitel konnten nicht geladen werden: \(error.localizedDescription)"
         }
     }
-    
-    
-    func selectQualification(_ qualification: EducationQualification) {
-        guard qualification.educationLevel == educationLevel else {
+
+    func selectQualification(
+        _ qualification: EducationQualification
+    ) {
+        guard qualifications.contains(
+            where: { $0.id == qualification.id }
+        ) else {
             return
         }
 
         selectedQualification = qualification
-        degree = qualification.name
-        qualificationSearchText = qualification.name
     }
+    
+    
+    
+    
+    
+    // MARK: - Catalog Loading
+
+    func loadEducationCatalog() async {
+        guard !isLoadingCatalog else { return }
+
+        isLoadingCatalog = true
+        catalogErrorMessage = nil
+
+        defer {
+            isLoadingCatalog = false
+        }
+
+        do {
+            async let types = educationRepository.fetchEducationTypes()
+            async let institutionTypes =
+                educationRepository.fetchEducationInstitutionTypes()
+
+            educationTypes = try await types
+            educationInstitutionTypes = try await institutionTypes
+        } catch {
+            catalogErrorMessage = error.localizedDescription
+        }
+    }
+
+    func selectEducationType(_ type: EducationType) async {
+        selectedEducationType = type
+        
+        selectedInstitution = nil
+        selectedInstitutionType = nil
+        institutionName = ""
+        institutionSearchText = ""
+        educationInstitutions = []
+
+        selectedEducationTypeDegree = nil
+        selectedEducationField = nil
+
+        educationTypeDegrees = []
+        educationFields = []
+
+        degree = ""
+        fieldOfStudy = ""
+        educationFieldSearchText = ""
+
+        // Alte Qualifikationsauswahl zurücksetzen.
+        selectedQualification = nil
+        qualificationSearchText = ""
+        qualifications = []
+
+        isLoadingDegrees = true
+        catalogErrorMessage = nil
+
+        defer {
+            isLoadingDegrees = false
+        }
+
+        do {
+            educationTypeDegrees =
+                try await educationRepository.fetchEducationTypeDegrees(
+                    educationTypeId: type.id
+                )
+        } catch {
+            catalogErrorMessage = error.localizedDescription
+        }
+        
+        if type.code == "A01" || type.code == "A10" {
+            await loadHigherEducationInstitutions()
+        }
+    }
+
+    func selectEducationTypeDegree(
+        _ selectedDegree: EducationTypeDegree
+    ) async {
+        guard selectedDegree.educationTypeId ==
+                selectedEducationType?.id else {
+            return
+        }
+
+        selectedEducationTypeDegree = selectedDegree
+        selectedEducationField = nil
+
+        degree = selectedDegree.nameDe
+        fieldOfStudy = ""
+        educationFields = []
+
+        await loadFieldsForSelectedDegree()
+    }
+
+    func loadFieldsForSelectedDegree() async {
+        guard let selectedEducationTypeDegree else {
+            educationFields = []
+            return
+        }
+
+        isLoadingFields = true
+        catalogErrorMessage = nil
+
+        defer {
+            isLoadingFields = false
+        }
+
+        do {
+            educationFields =
+                try await educationRepository.fetchFieldsForDegree(
+                    degreeId: selectedEducationTypeDegree.id
+                )
+        } catch {
+            catalogErrorMessage = error.localizedDescription
+        }
+    }
+
+    func searchEducationFields(
+        kind: String
+    ) async {
+        isLoadingFields = true
+        catalogErrorMessage = nil
+
+        defer {
+            isLoadingFields = false
+        }
+
+        do {
+            educationFields =
+                try await educationRepository.fetchEducationFields(
+                    kind: kind,
+                    searchText: educationFieldSearchText
+                )
+        } catch {
+            catalogErrorMessage = error.localizedDescription
+        }
+    }
+
+    func selectEducationField(_ field: EducationField) {
+        selectedEducationField = field
+        fieldOfStudy = field.nameDe
+        educationFieldSearchText = field.nameDe
+    }
+
+    func searchInstitutions() async {
+        isLoadingInstitutions = true
+        catalogErrorMessage = nil
+
+        defer {
+            isLoadingInstitutions = false
+        }
+
+        do {
+            educationInstitutions =
+                try await educationRepository.searchEducationInstitutions(
+                    searchText: institutionSearchText
+                )
+        } catch {
+            catalogErrorMessage = error.localizedDescription
+        }
+    }
+
+    func selectInstitution(_ institution: EducationInstitution) {
+        selectedInstitution = institution
+        institutionName = institution.name
+        institutionSearchText = institution.name
+
+        selectedInstitutionType =
+            educationInstitutionTypes.first {
+                $0.id == institution.institutionTypeId
+            }
+    }
+    
+    
+    
+    func loadHigherEducationInstitutions() async {
+        guard let educationTypeId = selectedEducationType?.id else {
+            return
+        }
+
+        isLoadingInstitutions = true
+        catalogErrorMessage = nil
+
+        defer {
+            isLoadingInstitutions = false
+        }
+
+        do {
+            let institutions =
+                try await educationRepository.searchEducationInstitutions(
+                    searchText: ""
+                )
+
+            guard selectedEducationType?.id == educationTypeId else {
+                return
+            }
+
+            educationInstitutions = institutions
+        } catch {
+            guard selectedEducationType?.id == educationTypeId else {
+                return
+            }
+
+            catalogErrorMessage =
+                "Hochschulen konnten nicht geladen werden: \(error.localizedDescription)"
+        }
+    }
+
+
+
 
     // MARK: - Normalization
 
@@ -291,5 +640,18 @@ final class EducationViewModel {
         isCurrent = false
 
         description = ""
+        
+        selectedEducationType = nil
+        selectedEducationTypeDegree = nil
+        selectedEducationField = nil
+        selectedInstitutionType = nil
+        selectedInstitution = nil
+
+        educationTypeDegrees = []
+        educationFields = []
+        educationInstitutions = []
+
+        educationFieldSearchText = ""
+        institutionSearchText = ""
     }
 }

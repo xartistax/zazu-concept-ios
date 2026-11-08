@@ -98,6 +98,16 @@ final class SkillRepository {
 
 
     // MARK: - Taxonomy
+    
+    func fetchSkillCategories() async throws -> [SkillCategory] {
+        try await client
+            .from("skill_categories")
+            .select("id, name, sort_order")
+            .order("sort_order", ascending: true)
+            .order("name", ascending: true)
+            .execute()
+            .value
+    }
 
     func fetchSkills() async throws -> [Skill] {
         var allSkills: [Skill] = []
@@ -107,7 +117,7 @@ final class SkillRepository {
         while true {
             let page: [Skill] = try await client
                 .from("skills")
-                .select("id, name, category")
+                .select("id, name, category, category_id")
                 .order("id", ascending: true)
                 .range(
                     from: offset,
@@ -131,29 +141,33 @@ final class SkillRepository {
 
     func searchSkills(
         query: String,
-        category: String? = nil
+        category: String? = nil,
+        categoryIds: [UUID] = [],
+        offset: Int = 0,
+        pageSize: Int = 30
     ) async throws -> [Skill] {
-
         let trimmedQuery = query.trimmingCharacters(
             in: .whitespacesAndNewlines
         )
 
-        guard trimmedQuery.count >= 2 else {
-            return []
-        }
-
-        let escapedQuery = trimmedQuery
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "%", with: "\\%")
-            .replacingOccurrences(of: "_", with: "\\_")
-
         var request = client
             .from("skills")
-            .select("id, name, category")
-            .ilike(
-                "name",
-                pattern: "%\(escapedQuery)%"
+            .select("id, name, category, category_id")
+
+        if !trimmedQuery.isEmpty {
+            let escapedQuery = trimmedQuery
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "%", with: "\\%")
+                .replacingOccurrences(of: "_", with: "\\_")
+
+            let pattern = "%\(escapedQuery)%"
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+
+            request = request.or(
+                "name.ilike.\"\(pattern)\",search_alias.ilike.\"\(pattern)\""
             )
+        }
 
         if let category {
             request = request.eq(
@@ -162,9 +176,20 @@ final class SkillRepository {
             )
         }
 
+        if !categoryIds.isEmpty {
+            request = request.in(
+                "category_id",
+                values: categoryIds
+            )
+        }
+
         return try await request
             .order("name", ascending: true)
-            .limit(30)
+            .order("id", ascending: true)
+            .range(
+                from: offset,
+                to: offset + pageSize - 1
+            )
             .execute()
             .value
     }
@@ -179,7 +204,7 @@ final class SkillRepository {
 
         return try await client
             .from("skills")
-            .select("id, name, category")
+            .select("id, name, category, category_id")
             .in("id", values: ids)
             .order("name", ascending: true)
             .execute()
@@ -250,6 +275,53 @@ final class SkillRepository {
             )
             .execute()
             .value
+    }
+    
+    
+    // MARK: - Candidate Skill Categories
+
+    func fetchCandidateSkillCategoryIDs(
+        candidateId: UUID
+    ) async throws -> Set<UUID> {
+        struct CategorySelection: Decodable {
+            let categoryId: UUID
+
+            enum CodingKeys: String, CodingKey {
+                case categoryId = "category_id"
+            }
+        }
+
+        let selections: [CategorySelection] = try await client
+            .from("candidate_skill_categories")
+            .select("category_id")
+            .eq("candidate_id", value: candidateId)
+            .execute()
+            .value
+
+        return Set(selections.map(\.categoryId))
+    }
+
+    func saveCandidateSkillCategories(
+        categoryIDs: Set<UUID>
+    ) async throws {
+        struct Parameters: Encodable {
+            let categoryIDs: [UUID]
+
+            enum CodingKeys: String, CodingKey {
+                case categoryIDs = "p_category_ids"
+            }
+        }
+
+        try await client
+            .rpc(
+                "save_candidate_skill_categories",
+                params: Parameters(
+                    categoryIDs: categoryIDs.sorted {
+                        $0.uuidString < $1.uuidString
+                    }
+                )
+            )
+            .execute()
     }
     
     

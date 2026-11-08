@@ -19,16 +19,20 @@ final class SkillsViewModel {
     // MARK: - State
 
     var skills: [Skill] = []
+    var skillCategories: [SkillCategory] = []
     var candidateSkills: [CandidateSkill] = []
     var candidateCustomSkills: [CandidateCustomSkill] = []
 
     var searchText = ""
-    var selectedCategory: String?
+    var selectedCategoryIDs: Set<UUID> = []
 
     var isLoading = false
     var isSearching = false
     var isSaving = false
     var errorMessage: String?
+    
+    var isSavingCategories = false
+    var categorySaveErrorMessage: String?
 
     private let skillRepository: SkillRepository
     private let candidateProfileRepository: CandidateProfileRepository
@@ -36,6 +40,12 @@ final class SkillsViewModel {
 
     private var searchTask: Task<Void, Never>?
     private var searchGeneration = 0
+    
+    var hasMoreSkills = true
+    private var hasLoaded = false
+
+    private var nextSkillOffset = 0
+    private let skillPageSize = 30
 
     // MARK: - Init
 
@@ -119,10 +129,10 @@ final class SkillsViewModel {
     // MARK: - Loading
 
     func load() async {
-        guard !isLoading else {
+        guard !isLoading, !hasLoaded else {
             return
         }
-
+        
         isLoading = true
         errorMessage = nil
 
@@ -141,18 +151,36 @@ final class SkillsViewModel {
                     candidateId: candidateId
                 )
 
+            async let categoriesRequest =
+                skillRepository.fetchSkillCategories()
+            
+            async let selectedCategoriesRequest =
+                skillRepository.fetchCandidateSkillCategoryIDs(
+                    candidateId: candidateId
+                )
+
             let (
                 loadedCandidateSkills,
-                loadedCustomSkills
+                loadedCustomSkills,
+                loadedCategories,
+                loadedSelectedCategoryIDs
             ) = try await (
                 candidateSkillsRequest,
-                customSkillsRequest
+                customSkillsRequest,
+                categoriesRequest,
+                selectedCategoriesRequest
             )
+            
+            selectedCategoryIDs = loadedSelectedCategoryIDs
+
+            skillCategories = loadedCategories
 
             candidateSkills = loadedCandidateSkills
             candidateCustomSkills = loadedCustomSkills
 
             await reloadSelectedSkillDetails()
+            
+            hasLoaded = true
 
             scheduleSearch()
         } catch {
@@ -169,16 +197,10 @@ final class SkillsViewModel {
         let generation = searchGeneration
 
         skills = []
-
-        guard hasSearchQuery else {
-            isSearching = false
-            return
-        }
-
+        nextSkillOffset = 0
+        hasMoreSkills = true
         isSearching = true
-
-        let query = searchText
-        let category = selectedCategory
+        errorMessage = nil
 
         searchTask = Task {
             do {
@@ -188,31 +210,103 @@ final class SkillsViewModel {
 
                 try Task.checkCancellation()
 
-                let results = try await skillRepository.searchSkills(
-                    query: query,
-                    category: category
-                )
-
-                guard !Task.isCancelled,
-                      generation == searchGeneration else {
-                    return
-                }
-
-                skills = results
-                isSearching = false
-
-            } catch is CancellationError {
-                return
-
-            } catch {
                 guard generation == searchGeneration else {
                     return
                 }
 
-                skills = []
-                isSearching = false
-                errorMessage = error.localizedDescription
+                await loadSkillPage(generation: generation)
+            } catch {
+                // Eine neuere Suche ersetzt diese Anfrage.
             }
+        }
+    }
+
+    func loadMoreSkills() async {
+        guard !isLoading,
+              !isSearching,
+              hasMoreSkills else {
+            return
+        }
+
+        isSearching = true
+        errorMessage = nil
+
+        await loadSkillPage(
+            generation: searchGeneration
+        )
+    }
+
+    private func loadSkillPage(
+        generation: Int
+    ) async {
+        let offset = nextSkillOffset
+        let query = searchText
+        let categoryIDs = Array(selectedCategoryIDs)
+
+        defer {
+            if generation == searchGeneration {
+                isSearching = false
+            }
+        }
+
+        do {
+            let results = try await skillRepository.searchSkills(
+                query: query,
+                categoryIds: categoryIDs,
+                offset: offset,
+                pageSize: skillPageSize
+            )
+
+            guard !Task.isCancelled,
+                  generation == searchGeneration else {
+                return
+            }
+
+            let existingIDs = Set(skills.map(\.id))
+
+            skills.append(
+                contentsOf: results.filter {
+                    !existingIDs.contains($0.id)
+                }
+            )
+
+            nextSkillOffset = offset + results.count
+            hasMoreSkills = results.count == skillPageSize
+
+        } catch {
+            guard !Task.isCancelled,
+                  generation == searchGeneration else {
+                return
+            }
+
+            errorMessage = error.localizedDescription
+        }
+    }
+    
+    
+    func saveCategorySelection() async -> Bool {
+        guard !isSavingCategories else {
+            return false
+        }
+
+        isSavingCategories = true
+        categorySaveErrorMessage = nil
+
+        let categoryIDs = selectedCategoryIDs
+
+        defer {
+            isSavingCategories = false
+        }
+
+        do {
+            try await skillRepository.saveCandidateSkillCategories(
+                categoryIDs: categoryIDs
+            )
+
+            return true
+        } catch {
+            categorySaveErrorMessage = error.localizedDescription
+            return false
         }
     }
 

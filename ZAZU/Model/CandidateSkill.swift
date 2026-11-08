@@ -8,6 +8,7 @@
 import Foundation
 
 enum SkillProficiency: String, Codable, CaseIterable, Sendable {
+    case beginner
     case basic
     case good
     case veryGood = "very_good"
@@ -15,15 +16,14 @@ enum SkillProficiency: String, Codable, CaseIterable, Sendable {
 
     var title: String {
         switch self {
+        case .beginner:
+            return "Anfänger"
         case .basic:
             return "Grundkenntnisse"
-
         case .good:
-            return "Gute Kenntnisse"
-
+            return "Fortgeschritten"
         case .veryGood:
-            return "Sehr gute Kenntnisse"
-
+            return "Sehr gut"
         case .expert:
             return "Experte"
         }

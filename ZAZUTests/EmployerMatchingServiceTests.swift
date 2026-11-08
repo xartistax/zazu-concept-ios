@@ -288,7 +288,8 @@ struct EmployerMatchingServiceTests {
             homeofficeSchedule: .flexible,
             fullyRemoteAvailable: false,
             homeofficeRequirementType: .optional,
-            workModelRequirementType: .optional
+            workModelRequirementType: .optional,
+            responsibleContactId: nil
         )
     }
 }

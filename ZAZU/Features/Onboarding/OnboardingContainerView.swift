@@ -9,7 +9,13 @@ import SwiftUI
 
 struct OnboardingContainerView: View {
     @State private var viewModel: OnboardingViewModel
+    @State private var educationViewModel: EducationViewModel
+    @State private var workExperienceViewModel: WorkExperienceViewModel
+    @State private var skillsViewModel: SkillsViewModel
     @Bindable var appState: AppState
+    @State private var languagesViewModel: LanguagesViewModel
+    @State private var jobPreferencesViewModel: JobPreferencesViewModel
+    @State private var workAndSalaryViewModel: WorkAndSalaryViewModel
 
     private let candidateProfileRepository: CandidateProfileRepository
     private let workExperienceRepository: WorkExperienceRepository
@@ -47,6 +53,46 @@ struct OnboardingContainerView: View {
                 userId: userId
             )
         )
+        _educationViewModel = State(
+            initialValue: EducationViewModel(
+                educationRepository: educationRepository,
+                candidateProfileRepository: candidateProfileRepository,
+                candidateId: userId
+            )
+        )
+        _workExperienceViewModel = State(
+            initialValue: WorkExperienceViewModel(
+                workExperienceRepository: workExperienceRepository,
+                candidateProfileRepository: candidateProfileRepository,
+                candidateId: userId
+            )
+        )
+        _skillsViewModel = State(
+            initialValue: SkillsViewModel(
+                skillRepository: skillRepository,
+                candidateProfileRepository: candidateProfileRepository,
+                candidateId: userId
+            )
+        )
+        _languagesViewModel = State(
+            initialValue: LanguagesViewModel(
+                languageRepository: languageRepository,
+                candidateProfileRepository: candidateProfileRepository,
+                candidateId: userId
+            )
+        )
+        _jobPreferencesViewModel = State(
+            initialValue: JobPreferencesViewModel(
+                repository: candidateProfileRepository,
+                userId: userId
+            )
+        )
+        _workAndSalaryViewModel = State(
+            initialValue: WorkAndSalaryViewModel(
+                repository: candidateProfileRepository,
+                userId: userId
+            )
+        )
     }
 
     var body: some View {
@@ -55,6 +101,50 @@ struct OnboardingContainerView: View {
                 loadingView
             } else {
                 onboardingContent
+                    .disabled(viewModel.isNavigating)
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if !viewModel.isInitialLoading,
+               viewModel.currentStep > 0 {
+                VStack(
+                    alignment: .leading,
+                    spacing: ZAZUSpacing.small
+                ) {
+                    HStack {
+                        Button {
+                            Task {
+                                await viewModel.goBack()
+                            }
+                        } label: {
+                            HStack(spacing: ZAZUSpacing.small) {
+                                if viewModel.isNavigating {
+                                    ProgressView()
+                                        .tint(ZAZUColors.primary)
+                                } else {
+                                    Image(systemName: "chevron.left")
+                                }
+
+                                Text("Zurück")
+                            }
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(ZAZUColors.primary)
+                            .padding(.vertical, ZAZUSpacing.small)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(viewModel.isNavigating)
+
+                        Spacer()
+                    }
+
+                    if let message = viewModel.navigationErrorMessage {
+                        Text(message)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
+                }
+                .padding(.horizontal, ZAZUSpacing.large)
+                .background(ZAZUColors.veryLightPurple)
             }
         }
         .task {
@@ -87,23 +177,15 @@ struct OnboardingContainerView: View {
 
         case 2:
             WorkExperienceView(
-                viewModel: WorkExperienceViewModel(
-                    workExperienceRepository: workExperienceRepository,
-                    candidateProfileRepository: candidateProfileRepository,
-                    candidateId: userId
-                ),
+                viewModel: workExperienceViewModel,
                 onContinue: {
                     viewModel.currentStep = 3
                 }
             )
-
+            
         case 3:
             SkillsView(
-                viewModel: SkillsViewModel(
-                    skillRepository: skillRepository,
-                    candidateProfileRepository: candidateProfileRepository,
-                    candidateId: userId
-                ),
+                viewModel: skillsViewModel,
                 onContinue: {
                     viewModel.currentStep = 4
                 }
@@ -111,11 +193,7 @@ struct OnboardingContainerView: View {
 
         case 4:
             LanguagesView(
-                viewModel: LanguagesViewModel(
-                    languageRepository: languageRepository,
-                    candidateProfileRepository: candidateProfileRepository,
-                    candidateId: userId
-                ),
+                viewModel: languagesViewModel,
                 onContinue: {
                     viewModel.currentStep = 5
                 }
@@ -123,10 +201,7 @@ struct OnboardingContainerView: View {
 
         case 5:
             JobPreferencesView(
-                viewModel: JobPreferencesViewModel(
-                    repository: candidateProfileRepository,
-                    userId: userId
-                ),
+                viewModel: jobPreferencesViewModel,
                 onContinue: {
                     viewModel.currentStep = 6
                 }
@@ -134,10 +209,7 @@ struct OnboardingContainerView: View {
 
         case 6:
             WorkAndSalaryView(
-                viewModel: WorkAndSalaryViewModel(
-                    repository: candidateProfileRepository,
-                    userId: userId
-                ),
+                viewModel: workAndSalaryViewModel,
                 onContinue: {
                     viewModel.currentStep = 7
                 }

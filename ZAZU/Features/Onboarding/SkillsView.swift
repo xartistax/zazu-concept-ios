@@ -15,6 +15,9 @@ struct SkillsView: View {
     @State private var customSkillName = ""
     @State private var customSkillProficiency: SkillProficiency?
     
+    @State private var isCategorySheetPresented = false
+    @State private var categorySearchText = ""
+    
     enum Mode {
         case onboarding
         case editing
@@ -52,11 +55,7 @@ struct SkillsView: View {
                 } else {
                     selectedSkillsSection
 
-                    if viewModel.hasSearchQuery {
-                        availableSkillsSection
-                    } else {
-                        searchHint
-                    }
+                    availableSkillsSection
 
                     errorMessage
 
@@ -72,6 +71,14 @@ struct SkillsView: View {
         }
         .sheet(item: $skillToConfigure) { skill in
             proficiencySheet(for: skill)
+        }
+        .sheet(
+            isPresented: $isCategorySheetPresented,
+            onDismiss: {
+                viewModel.scheduleSearch()
+            }
+        ) {
+            categorySelectionSheet
         }
         .sheet(isPresented: $isCustomSkillSheetPresented) {
             customSkillSheet
@@ -91,19 +98,16 @@ struct SkillsView: View {
                         ? "Wähle deine relevanten Kenntnisse aus und gib dein Niveau an."
                         : "Verwalte deine Skills und passe deine Kenntnisstufen an."
                 )
-                .foregroundStyle(ZAZUColors.textSecondary)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(ZAZUColors.primary)
+       
 
                 Spacer()
 
-                Text("3 von 8")
+                Text("4 von 8")
                     .font(.subheadline)
                     .foregroundStyle(ZAZUColors.textSecondary)
             }
 
-            ProgressView(value: 3, total: 8)
+            ProgressView(value: 4, total: 8)
                 .tint(ZAZUColors.primary)
         }
     }
@@ -196,56 +200,185 @@ struct SkillsView: View {
         )
     }
     
+
     // MARK: - Categories
 
     private var categoryFilter: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: ZAZUSpacing.small) {
-                categoryButton(
-                    title: "Alle",
-                    category: nil
-                )
+        Button {
+            categorySearchText = ""
+            isCategorySheetPresented = true
+        } label: {
+            HStack(spacing: ZAZUSpacing.medium) {
+                Image(systemName: "line.3.horizontal.decrease")
 
-                ForEach(
-                    viewModel.categories,
-                    id: \.self
-                ) { category in
-                    categoryButton(
-                        title: viewModel.categoryTitle(category),
-                        category: category
+                VStack(alignment: .leading, spacing: ZAZUSpacing.xSmall) {
+                    Text("Berufsgruppen wählen")
+                        .fontWeight(.semibold)
+
+                    Text(
+                        viewModel.selectedCategoryIDs.isEmpty
+                            ? "Alle Berufsgruppen"
+                            : "\(viewModel.selectedCategoryIDs.count) ausgewählt"
                     )
+                    .font(.caption)
+                    .foregroundStyle(ZAZUColors.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+            }
+            .foregroundStyle(ZAZUColors.textPrimary)
+            .padding(ZAZUSpacing.medium)
+            .background(ZAZUColors.white)
+            .clipShape(
+                RoundedRectangle(cornerRadius: ZAZURadius.medium)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+    
+    
+    private var categorySelectionSheet: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Button {
+                        viewModel.selectedCategoryIDs.removeAll()
+                    } label: {
+                        HStack {
+                            Text("Alle Berufsgruppen")
+
+                            Spacer()
+
+                            if viewModel.selectedCategoryIDs.isEmpty {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                        .foregroundStyle(ZAZUColors.primary)
+                    }
+                } footer: {
+                    Text("Mehrere Berufsgruppen sind auswählbar.")
+                }
+                
+                
+                if let message = viewModel.categorySaveErrorMessage {
+                    Section {
+                        Text(message)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                Section("Berufsgruppen") {
+                    ForEach(viewModel.skillCategories.filter { category in
+                        let query = categorySearchText
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+                        return query.isEmpty
+                            || category.name.localizedStandardContains(query)
+                    }) { category in
+                        Button {
+                            if viewModel.selectedCategoryIDs.contains(category.id) {
+                                viewModel.selectedCategoryIDs.remove(category.id)
+                            } else {
+                                viewModel.selectedCategoryIDs.insert(category.id)
+                            }
+                        } label: {
+                            HStack {
+                                Text(category.name)
+
+                                Spacer()
+
+                                Image(
+                                    systemName:
+                                        viewModel.selectedCategoryIDs.contains(category.id)
+                                        ? "checkmark.circle.fill"
+                                        : "circle"
+                                )
+                                .foregroundStyle(ZAZUColors.primary)
+                            }
+                            .foregroundStyle(ZAZUColors.textPrimary)
+                        }
+                    }
+                }
+            }
+            .disabled(viewModel.isSavingCategories)
+            .searchable(
+                text: $categorySearchText,
+                prompt: "Berufsgruppe suchen"
+            )
+            .navigationTitle("Berufsgruppen")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task {
+                            let didSave =
+                                await viewModel.saveCategorySelection()
+
+                            if didSave {
+                                isCategorySheetPresented = false
+                            }
+                        }
+                    } label: {
+                        if viewModel.isSavingCategories {
+                            ProgressView()
+                        } else {
+                            Text("Fertig")
+                        }
+                    }
+                    .disabled(viewModel.isSavingCategories)
                 }
             }
         }
+        .presentationDetents([.large])
+        .interactiveDismissDisabled()
     }
 
     private func categoryButton(
         title: String,
-        category: String?
+        categoryID: UUID?
     ) -> some View {
-        let isSelected =
-            viewModel.selectedCategory == category
+        let isSelected = categoryID.map {
+            viewModel.selectedCategoryIDs.contains($0)
+        } ?? viewModel.selectedCategoryIDs.isEmpty
 
         return Button {
-            viewModel.selectedCategory = category
+            if let categoryID {
+                if viewModel.selectedCategoryIDs.contains(categoryID) {
+                    viewModel.selectedCategoryIDs.remove(categoryID)
+                } else {
+                    viewModel.selectedCategoryIDs.insert(categoryID)
+                }
+            } else {
+                viewModel.selectedCategoryIDs.removeAll()
+            }
+
             viewModel.scheduleSearch()
         } label: {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(
-                    isSelected
-                        ? ZAZUColors.white
-                        : ZAZUColors.textPrimary
-                )
-                .padding(.horizontal, ZAZUSpacing.medium)
-                .padding(.vertical, ZAZUSpacing.small)
-                .background(
-                    isSelected
-                        ? ZAZUColors.primary
-                        : ZAZUColors.white
-                )
-                .clipShape(Capsule())
+            HStack(spacing: ZAZUSpacing.xSmall) {
+                if isSelected {
+                    Image(systemName: "checkmark")
+                }
+
+                Text(title)
+            }
+            .font(.subheadline)
+            .fontWeight(.semibold)
+            .foregroundStyle(
+                isSelected
+                    ? ZAZUColors.white
+                    : ZAZUColors.textPrimary
+            )
+            .padding(.horizontal, ZAZUSpacing.medium)
+            .padding(.vertical, ZAZUSpacing.small)
+            .background(
+                isSelected
+                    ? ZAZUColors.primary
+                    : ZAZUColors.white
+            )
+            .clipShape(Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -369,7 +502,7 @@ struct SkillsView: View {
     // MARK: - Available Skills
 
     private var availableSkillsSection: some View {
-        VStack(
+        LazyVStack(
             alignment: .leading,
             spacing: ZAZUSpacing.medium
         ) {
@@ -377,22 +510,46 @@ struct SkillsView: View {
                 .font(.headline)
                 .foregroundStyle(ZAZUColors.textPrimary)
 
-            if viewModel.isSearching {
-                ProgressView("Skills werden gesucht …")
+            if viewModel.isSearching && viewModel.skills.isEmpty {
+                ProgressView("Skills werden geladen …")
                     .tint(ZAZUColors.primary)
                     .padding(.vertical, ZAZUSpacing.medium)
 
-            } else if viewModel.filteredSkills.isEmpty {
-                Text("Keine passenden Skills gefunden.")
+            } else {
+                if viewModel.filteredSkills.isEmpty {
+                    Text(
+                        viewModel.hasMoreSkills
+                            ? "In diesem Abschnitt sind keine weiteren auswählbaren Skills."
+                            : "Keine weiteren passenden Skills gefunden."
+                    )
                     .foregroundStyle(ZAZUColors.textSecondary)
                     .padding(.vertical, ZAZUSpacing.medium)
+                }
 
-            } else {
                 ForEach(viewModel.filteredSkills) { skill in
                     skillRow(skill)
                 }
+
+                if viewModel.hasMoreSkills {
+                    if viewModel.errorMessage == nil {
+                        ProgressView("Weitere Skills laden …")
+                            .tint(ZAZUColors.primary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, ZAZUSpacing.medium)
+                            .task(id: viewModel.skills.count) {
+                                await viewModel.loadMoreSkills()
+                            }
+                    } else {
+                        Button("Erneut laden") {
+                            Task {
+                                await viewModel.loadMoreSkills()
+                            }
+                        }
+                        .disabled(viewModel.isSearching)
+                    }
+                }
             }
-            
+
             Button {
                 customSkillName = viewModel.searchText
                     .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -430,8 +587,6 @@ struct SkillsView: View {
                 )
             }
             .buttonStyle(.plain)
-            
-            
         }
     }
 

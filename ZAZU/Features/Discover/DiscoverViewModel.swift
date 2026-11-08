@@ -173,7 +173,7 @@ final class DiscoverViewModel {
                 !interactedJobIds.contains($0.id)
             }
             
-            self.jobs = availableJobs
+         
             self.companies = companies
             self.skillRequirements = skillRequirements
             self.languageRequirements = languageRequirements
@@ -214,6 +214,10 @@ final class DiscoverViewModel {
             }
 
             matchResults = results
+            
+            self.jobs = availableJobs.filter { job in
+                results[job.id]?.fulfillsAllMustCriteria == true
+            }
 
         } catch {
             errorMessage = error.localizedDescription

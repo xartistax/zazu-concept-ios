@@ -1,0 +1,124 @@
+BEGIN;
+
+CREATE TABLE public.education_types (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    code text NOT NULL UNIQUE,
+    name_de text NOT NULL,
+    internal_group text,
+    countries text[] NOT NULL DEFAULT '{}',
+    sort_order integer NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE public.education_type_degrees (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    education_type_id uuid NOT NULL
+        REFERENCES public.education_types(id)
+        ON DELETE RESTRICT,
+    name_de text NOT NULL,
+    note text,
+    sort_order integer NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (education_type_id, name_de)
+);
+
+CREATE INDEX idx_education_type_degrees_type
+    ON public.education_type_degrees(education_type_id);
+
+ALTER TABLE public.education_types ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.education_type_degrees ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated users can read education types"
+    ON public.education_types
+    FOR SELECT TO authenticated
+    USING (true);
+
+CREATE POLICY "Authenticated users can read education type degrees"
+    ON public.education_type_degrees
+    FOR SELECT TO authenticated
+    USING (true);
+
+INSERT INTO public.education_types
+    (code, name_de, internal_group, countries, sort_order)
+VALUES
+('A01', 'Studium', 'Hochschule', ARRAY['CH','DE'], 1),
+('A02', 'Berufslehre / Berufsausbildung', 'Berufliche Grundbildung', ARRAY['CH','DE'], 2),
+('A03', 'Berufsmaturität', 'Mittelschule / Berufsmaturitätsschule', ARRAY['CH'], 3),
+('A04', 'Gymnasium / Maturität', 'Allgemeinbildung', ARRAY['CH','DE'], 4),
+('A05', 'Fachmittelschule', 'Allgemeinbildung', ARRAY['CH'], 5),
+('A06', 'Passerelle / Ergänzungsprüfung', 'Hochschulzugang', ARRAY['CH'], 6),
+('A07', 'Höhere Fachschule (HF)', 'Höhere Berufsbildung', ARRAY['CH'], 7),
+('A08', 'Berufsprüfung (BP)', 'Höhere Berufsbildung', ARRAY['CH'], 8),
+('A09', 'Höhere Fachprüfung (HFP)', 'Höhere Berufsbildung', ARRAY['CH'], 9),
+('A10', 'Hochschulweiterbildung', 'Weiterbildung', ARRAY['CH','DE'], 10),
+('A11', 'Berufliche Weiterbildung', 'Weiterbildung', ARRAY['CH','DE'], 11),
+('A12', 'Medizinische Weiterbildung', 'Reglementierte Weiterbildung', ARRAY['CH','DE'], 12),
+('A13', 'Schulabschluss', 'Schulbildung', ARRAY['CH','DE'], 13),
+('A14', 'Brückenangebot / Vorbereitungsbildung', 'Übergangsbildung', ARRAY['CH','DE'], 14),
+('A15', 'Sonstige Ausbildung', 'Sonstiges', ARRAY['CH','DE'], 15);
+
+WITH degree_data(type_code, name_de, note, sort_order) AS (
+    VALUES
+    ('A01', 'Bachelor', 'Akademischer Abschluss', 1),
+    ('A01', 'Master', 'Akademischer Abschluss', 2),
+    ('A01', 'Doktorat / Promotion / PhD', 'Akademischer Abschluss', 3),
+    ('A01', 'Staatsexamen', 'Akademischer / staatlicher Abschluss', 4),
+    ('A01', 'Diplom (historisch / DE)', 'Historischer Hochschulabschluss', 5),
+    ('A01', 'Magister (historisch / DE)', 'Historischer Hochschulabschluss', 6),
+
+    ('A02', 'Eidgenössisches Berufsattest (EBA)', 'CH', 1),
+    ('A02', 'Eidgenössisches Fähigkeitszeugnis (EFZ)', 'CH', 2),
+    ('A02', 'Anerkannter Ausbildungsabschluss (DE)', 'DE', 3),
+
+    ('A03', 'Berufsmaturität BM1', 'CH', 1),
+    ('A03', 'Berufsmaturität BM2', 'CH', 2),
+
+    ('A04', 'Gymnasiale Maturität', 'CH', 1),
+    ('A04', 'Abitur / Allgemeine Hochschulreife', 'DE', 2),
+
+    ('A05', 'Fachmittelschulausweis', 'CH', 1),
+    ('A05', 'Fachmaturität', 'CH', 2),
+
+    ('A06', 'Ergänzungsprüfung Passerelle', 'CH', 1),
+
+    ('A07', 'Diplom HF', 'CH', 1),
+    ('A07', 'Nachdiplomstudium HF (NDS HF)', 'CH', 2),
+
+    ('A08', 'Eidgenössischer Fachausweis', 'CH', 1),
+    ('A09', 'Eidgenössisches Diplom', 'CH', 1),
+
+    ('A10', 'CAS', 'Weiterbildung', 1),
+    ('A10', 'DAS', 'Weiterbildung', 2),
+    ('A10', 'MAS', 'Weiterbildung', 3),
+    ('A10', 'MBA', 'Weiterbildung', 4),
+    ('A10', 'EMBA', 'Weiterbildung', 5),
+
+    ('A11', 'Weiterbildungszertifikat', 'Weiterbildung', 1),
+    ('A11', 'Weiterbildungsdiplom', 'Weiterbildung', 2),
+    ('A11', 'Kursbestätigung', 'Weiterbildung', 3),
+
+    ('A12', 'Facharzttitel', 'Medizin', 1),
+    ('A12', 'Schwerpunkt', 'Medizin', 2),
+    ('A12', 'Fähigkeitsausweis', 'Medizin', 3),
+    ('A12', 'Anderer reglementierter Weiterbildungstitel', 'Gesundheitsberufe', 4),
+
+    ('A13', 'Obligatorische Schule', 'CH', 1),
+    ('A13', 'Hauptschulabschluss', 'DE', 2),
+    ('A13', 'Mittlerer Schulabschluss', 'DE', 3),
+    ('A13', 'Fachhochschulreife', 'DE', 4),
+
+    ('A14', 'Brückenangebot / Vorbereitung', 'Kein einheitlicher Abschluss', 1),
+    ('A15', 'Sonstiger Abschluss', 'Freitext mit Prüfung', 1)
+)
+INSERT INTO public.education_type_degrees
+    (education_type_id, name_de, note, sort_order)
+SELECT
+    t.id,
+    d.name_de,
+    d.note,
+    d.sort_order
+FROM degree_data d
+JOIN public.education_types t
+    ON t.code = d.type_code;
+
+COMMIT;

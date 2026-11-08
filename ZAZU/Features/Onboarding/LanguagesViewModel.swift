@@ -20,6 +20,8 @@ final class LanguagesViewModel {
     var isLoading = false
     var isSaving = false
     var errorMessage: String?
+    
+    private var hasLoaded = false
 
     private let languageRepository: LanguageRepository
     private let candidateProfileRepository: CandidateProfileRepository
@@ -76,7 +78,7 @@ final class LanguagesViewModel {
     // MARK: - Loading
 
     func load() async {
-        guard !isLoading else {
+        guard !isLoading, !hasLoaded else {
             return
         }
 
@@ -106,6 +108,8 @@ final class LanguagesViewModel {
 
             languages = loadedLanguages
             candidateLanguages = loadedCandidateLanguages
+            
+            hasLoaded = true
 
         } catch {
             errorMessage = error.localizedDescription

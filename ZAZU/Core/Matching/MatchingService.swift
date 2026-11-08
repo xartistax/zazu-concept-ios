@@ -15,7 +15,8 @@ struct MatchingService {
         candidateSkill: CandidateSkill?,
         requirement: JobSkillRequirement
     ) -> Bool {
-        guard let candidateSkill else {
+        guard let candidateSkill,
+              candidateSkill.skillId == requirement.skillId else {
             return false
         }
 
@@ -153,6 +154,8 @@ struct MatchingService {
         _ proficiency: SkillProficiency
     ) -> Int {
         switch proficiency {
+        case .beginner:
+            return 0
         case .basic:
             return 1
         case .good:

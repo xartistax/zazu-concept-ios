@@ -57,7 +57,7 @@ struct WorkExperienceView: View {
                         .disabled(!viewModel.experiences.isEmpty)
                     }
 
-                    if !viewModel.hasNoWorkExperience {
+                    if mode == .editing || !viewModel.hasNoWorkExperience {
                         form
                     }
 
@@ -93,12 +93,12 @@ struct WorkExperienceView: View {
 
                 Spacer()
 
-                Text("2 von 8")
+                Text("3 von 8")
                     .font(.subheadline)
                     .foregroundStyle(ZAZUColors.textSecondary)
             }
 
-            ProgressView(value: 2, total: 8)
+            ProgressView(value: 3, total: 8)
                 .tint(ZAZUColors.primary)
         }
     }

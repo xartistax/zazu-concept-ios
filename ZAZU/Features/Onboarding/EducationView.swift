@@ -8,15 +8,16 @@
 import SwiftUI
 
 struct EducationView: View {
+
     @State private var viewModel: EducationViewModel
     
+
     enum Mode {
         case onboarding
         case editing
     }
 
     private let mode: Mode
-
     let onContinue: () -> Void
 
     init(
@@ -55,7 +56,7 @@ struct EducationView: View {
                         .disabled(!viewModel.educations.isEmpty)
                     }
 
-                    if !viewModel.hasNoFormalQualification {
+                    if mode == .editing || !viewModel.hasNoFormalQualification {
                         form
                     }
 
@@ -83,22 +84,20 @@ struct EducationView: View {
         ) {
             HStack {
                 Text(
-                    mode == .onboarding
-                        ? "Füge relevante Ausbildungen und Qualifikationen zu deinem Profil hinzu."
-                        : "Verwalte deine Ausbildungen und Qualifikationen."
+                    "Füge relevante Ausbildungen und Qualifikationen zu deinem Profil hinzu."
                 )
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(ZAZUColors.primary)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(ZAZUColors.primary)
 
                 Spacer()
 
-                Text("4 von 8")
+                Text("2 von 8")
                     .font(.subheadline)
                     .foregroundStyle(ZAZUColors.textSecondary)
             }
 
-            ProgressView(value: 4, total: 8)
+            ProgressView(value: 2, total: 8)
                 .tint(ZAZUColors.primary)
         }
     }
@@ -114,7 +113,9 @@ struct EducationView: View {
                 .foregroundStyle(ZAZUColors.textPrimary)
 
             Text(
-                "Füge relevante Ausbildungen und Qualifikationen zu deinem Profil hinzu."
+                mode == .onboarding
+                    ? "Füge relevante Ausbildungen und Qualifikationen zu deinem Profil hinzu."
+                    : "Verwalte deine Ausbildungen und Qualifikationen."
             )
             .foregroundStyle(ZAZUColors.textSecondary)
         }
@@ -151,14 +152,18 @@ struct EducationView: View {
                 alignment: .leading,
                 spacing: ZAZUSpacing.xSmall
             ) {
-                Text(education.degree)
-                    .font(.headline)
-                    .foregroundStyle(ZAZUColors.textPrimary)
+                
+                if let qualification = education.qualification {
+                    Text(qualification.name)
+                        .font(.subheadline)
+                        .foregroundStyle(ZAZUColors.primary)
+                }
 
                 Text(education.institutionName)
                     .foregroundStyle(ZAZUColors.textSecondary)
 
-                if let field = education.fieldOfStudy {
+                if let field = education.fieldOfStudy,
+                   !field.isEmpty {
                     Text(field)
                         .font(.subheadline)
                         .foregroundStyle(ZAZUColors.textSecondary)
@@ -206,54 +211,22 @@ struct EducationView: View {
                 .font(.headline)
                 .foregroundStyle(ZAZUColors.textPrimary)
 
-            textField(
-                "Institution / Schule",
-                text: $viewModel.institutionName
-            )
-            
-            Picker("Ausbildungsniveau", selection: $viewModel.educationLevel) {
-                Text("Obligatorische Schule").tag("compulsory_school")
-                Text("Berufsattest (EBA)").tag("eba")
-                Text("Berufslehre (EFZ)").tag("efz")
-                Text("Berufsmaturität").tag("vocational_baccalaureate")
-                Text("Fachmittelschule").tag("specialised_school")
-                Text("Fachmaturität").tag("specialised_baccalaureate")
-                Text("Eidg. Fachausweis").tag("federal_professional_exam")
-                Text("Eidg. Diplom").tag("higher_professional_exam")
-                Text("Höhere Fachschule (HF)").tag("higher_technical_college")
-                Text("Bachelor").tag("bachelor")
-                Text("Master").tag("master")
-                Text("Doktorat / PhD").tag("doctorate")
-                Text("CAS").tag("cas")
-                Text("DAS").tag("das")
-                Text("MAS").tag("mas")
-                Text("Andere Qualifikation").tag("other")
-            }
-            .pickerStyle(.menu)
-            .tint(ZAZUColors.primary)
-            .onChange(of: viewModel.educationLevel) { _, _ in
-                viewModel.selectedQualification = nil
-                viewModel.degree = ""
-                viewModel.qualificationSearchText = ""
-                viewModel.qualifications = []
-            }
-
-            qualificationSelection
-
-            textField(
-                "Fachrichtung (optional)",
-                text: $viewModel.fieldOfStudy
-            )
+            educationCatalogSelection
 
             startDateSection
 
-            Picker("Ausbildungsstatus", selection: $viewModel.completionStatus) {
+            Picker(
+                "Ausbildungsstatus",
+                selection: $viewModel.completionStatus
+            ) {
                 Text("Abgeschlossen").tag("completed")
                 Text("In Ausbildung").tag("in_progress")
                 Text("Nicht abgeschlossen").tag("not_completed")
             }
             .pickerStyle(.segmented)
-            .onChange(of: viewModel.completionStatus) { _, newValue in
+            .onChange(
+                of: viewModel.completionStatus
+            ) { _, newValue in
                 viewModel.isCurrent = newValue == "in_progress"
             }
 
@@ -272,6 +245,520 @@ struct EducationView: View {
         )
     }
 
+    // MARK: - Education Catalog
+
+    private var educationCatalogSelection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: ZAZUSpacing.medium
+        ) {
+            if viewModel.isLoadingCatalog {
+                ProgressView("Ausbildungskatalog laden …")
+                    .tint(ZAZUColors.primary)
+            }
+
+            if let error = viewModel.catalogErrorMessage {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+
+            educationTypeSelection
+
+            if viewModel.selectedEducationType != nil {
+                educationDegreeSelection
+            }
+
+            if viewModel.selectedEducationTypeDegree != nil {
+                educationFieldSelection
+            }
+
+            if viewModel.selectedEducationType != nil {
+                institutionSelection
+            }
+
+            if viewModel.selectedEducationTypeDegree != nil {
+                qualificationSelection
+            }
+        }
+        .task(id: viewModel.qualificationContextID) {
+            await viewModel.loadQualificationOptions()
+        }
+    }
+
+    // MARK: - Education Type
+
+    private var educationTypeSelection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: ZAZUSpacing.small
+        ) {
+            fieldLabel("Ausbildungsart")
+
+            ZAZUDropdownField(
+                "Ausbildungsart",
+                selection: Binding<UUID?>(
+                    get: {
+                        viewModel.selectedEducationType?.id
+                    },
+                    set: { newId in
+                        guard let type = viewModel.educationTypes.first(
+                            where: { $0.id == newId }
+                        ) else {
+                            return
+                        }
+
+                        Task {
+                            await viewModel.selectEducationType(type)
+                        }
+                    }
+                )
+            ) {
+                Text("Bitte auswählen")
+                    .tag(nil as UUID?)
+
+                ForEach(viewModel.educationTypes) { type in
+                    Text(type.nameDe)
+                        .tag(Optional(type.id))
+                }
+            }
+        }
+    }
+    
+    private var qualificationSelection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: ZAZUSpacing.small
+        ) {
+            fieldLabel("Offizieller Abschlusstitel (optional)")
+
+            if viewModel.isLoadingQualifications {
+                ProgressView("Abschlusstitel laden …")
+                    .tint(ZAZUColors.primary)
+
+            } else if viewModel.qualifications.isEmpty {
+                Text(
+                    viewModel.catalogErrorMessage == nil
+                        ? "Für diese Auswahl ist noch kein Abschlusstitel hinterlegt."
+                        : "Abschlusstitel sind momentan nicht verfügbar."
+                )
+                .font(.caption)
+                .foregroundStyle(ZAZUColors.textSecondary)
+
+            } else {
+                ZAZUDropdownField(
+                    "Abschlusstitel auswählen",
+                    selection: Binding<UUID?>(
+                        get: {
+                            viewModel.selectedQualification?.id
+                        },
+                        set: { newID in
+                            guard let qualification =
+                                viewModel.qualifications.first(
+                                    where: { $0.id == newID }
+                                )
+                            else {
+                                viewModel.selectedQualification = nil
+                                return
+                            }
+
+                            viewModel.selectQualification(qualification)
+                        }
+                    )
+                ) {
+                    Text("Nicht ausgewählt")
+                        .tag(nil as UUID?)
+
+                    ForEach(viewModel.qualifications) { qualification in
+                        Text(qualification.name)
+                            .tag(Optional(qualification.id))
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Education Degree
+
+    private var educationDegreeSelection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: ZAZUSpacing.small
+        ) {
+            fieldLabel("Abschluss / Qualifikation")
+
+            if viewModel.isLoadingDegrees {
+                ProgressView()
+                    .tint(ZAZUColors.primary)
+            } else {
+                ZAZUDropdownField(
+                    "Abschluss",
+                    selection: Binding<UUID?>(
+                        get: {
+                            viewModel.selectedEducationTypeDegree?.id
+                        },
+                        set: { newId in
+                            guard let degree =
+                                viewModel.educationTypeDegrees.first(
+                                    where: { $0.id == newId }
+                                ) else {
+                                    return
+                                }
+
+                            Task {
+                                await viewModel.selectEducationTypeDegree(
+                                    degree
+                                )
+                            }
+                        }
+                    )
+                ) {
+                    Text("Bitte auswählen")
+                        .tag(nil as UUID?)
+
+                    ForEach(viewModel.educationTypeDegrees) { degree in
+                        Text(degree.nameDe)
+                            .tag(Optional(degree.id))
+                    }
+                }
+            }
+        }
+    }
+
+    
+    private var educationFieldSelection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: ZAZUSpacing.small
+        ) {
+            fieldLabel(
+                isApprenticeship
+                    ? "Lehrberuf"
+                    : isHigherEducation
+                        ? "Studienrichtung"
+                        : "Fachrichtung"
+            )
+
+            if viewModel.isLoadingFields {
+                ProgressView("Fachrichtungen laden …")
+                    .tint(ZAZUColors.primary)
+            } else {
+                textField(
+                    "Fachrichtung / Lehrberuf suchen",
+                    text: $viewModel.educationFieldSearchText
+                )
+                .onChange(
+                    of: viewModel.selectedEducationTypeDegree?.id
+                ) { _, _ in
+                    viewModel.educationFieldSearchText = ""
+                }
+
+                ZAZUDropdownField(
+                    "Fachrichtung auswählen",
+                    selection: Binding<UUID?>(
+                        get: {
+                            viewModel.selectedEducationField?.id
+                        },
+                        set: { newId in
+                            guard let field = viewModel.educationFields.first(
+                                where: { $0.id == newId }
+                            ) else {
+                                viewModel.selectedEducationField = nil
+                                viewModel.fieldOfStudy = ""
+                                return
+                            }
+
+                            viewModel.selectEducationField(field)
+                        }
+                    )
+                ) {
+                    Text("Bitte auswählen")
+                        .tag(nil as UUID?)
+
+                    ForEach(viewModel.educationFields.filter { field in
+                        let query = viewModel.educationFieldSearchText
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+                        return query.isEmpty
+                            || field.nameDe.localizedStandardContains(query)
+                            || field.id == viewModel.selectedEducationField?.id
+                    }) { field in
+                        Text(field.nameDe)
+                            .tag(Optional(field.id))
+                    }
+                }
+
+                if viewModel.educationFields.isEmpty {
+                    Text(
+                        "Für diesen Abschluss sind noch keine Fachrichtungen im Katalog hinterlegt."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ZAZUColors.textSecondary)
+                } else if !viewModel.educationFields.contains(where: { field in
+                    let query = viewModel.educationFieldSearchText
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+
+                    return query.isEmpty
+                        || field.nameDe.localizedStandardContains(query)
+                }) {
+                    Text("Keine passende Fachrichtung gefunden.")
+                        .font(.caption)
+                        .foregroundStyle(ZAZUColors.textSecondary)
+                }            }
+        }
+    }
+
+
+    // MARK: - Institution Context
+
+    private var educationTypeCode: String? {
+        viewModel.selectedEducationType?.code
+    }
+
+    private var isApprenticeship: Bool {
+        educationTypeCode == "A02"
+    }
+
+    private var isHigherEducation: Bool {
+        educationTypeCode == "A01"
+            || educationTypeCode == "A10"
+    }
+
+    private var isSchoolEducation: Bool {
+        guard let code = educationTypeCode else {
+            return false
+        }
+
+        return [
+            "A03", "A04", "A05",
+            "A06", "A13", "A14"
+        ].contains(code)
+    }
+
+    private var isProfessionalEducation: Bool {
+        guard let code = educationTypeCode else {
+            return false
+        }
+
+        return [
+            "A07", "A08", "A09",
+            "A11", "A12"
+        ].contains(code)
+    }
+
+    private var institutionTitle: String {
+        if isApprenticeship {
+            return "Lehrbetrieb"
+        }
+
+        if isHigherEducation {
+            return "Hochschule / Universität"
+        }
+
+        if isSchoolEducation {
+            return "Schule / Bildungsinstitution"
+        }
+
+        if isProfessionalEducation {
+            return "Bildungsanbieter / Institution"
+        }
+
+        return "Institution / Bildungsort"
+    }
+
+    private var institutionPlaceholder: String {
+        if isApprenticeship {
+            return "Name des Lehrbetriebs"
+        }
+
+        if isHigherEducation {
+            return "Name der Hochschule oder Universität"
+        }
+
+        if isSchoolEducation {
+            return "Name der Schule"
+        }
+
+        if isProfessionalEducation {
+            return "Name des Bildungsanbieters"
+        }
+
+        return "Schule, Bildungsanbieter oder Institution"
+    }
+
+    
+    // MARK: - Institution
+
+    @ViewBuilder
+    private var institutionSelection: some View {
+        if isHigherEducation {
+            higherEducationInstitutionSelection
+        } else {
+            otherInstitutionSelection
+        }
+    }
+
+    private var higherEducationInstitutionSelection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: ZAZUSpacing.small
+        ) {
+            fieldLabel("Hochschule / Universität")
+
+            ZAZUDropdownField(
+                "Hochschule auswählen",
+                selection: Binding<UUID?>(
+                    get: {
+                        viewModel.selectedInstitution?.id
+                    },
+                    set: { newId in
+                        guard let institution =
+                            viewModel.educationInstitutions.first(
+                                where: { $0.id == newId }
+                            ) else {
+                                return
+                            }
+
+                        viewModel.selectInstitution(institution)
+                    }
+                )
+            ) {
+                Text("Bitte auswählen")
+                    .tag(nil as UUID?)
+
+                ForEach(viewModel.educationInstitutions) { institution in
+                    Text(institution.name)
+                        .tag(Optional(institution.id))
+                }
+            }
+        }
+    }
+
+    private var otherInstitutionSelection: some View {
+        VStack(
+            alignment: .leading,
+            spacing: ZAZUSpacing.small
+        ) {
+            fieldLabel(institutionTitle)
+
+            textField(
+                institutionPlaceholder,
+                text: $viewModel.institutionName
+            )
+            .onChange(
+                of: viewModel.institutionName
+            ) { _, newValue in
+                if viewModel.selectedInstitution?.name != newValue {
+                    viewModel.selectedInstitution = nil
+                }
+            }
+
+            if isApprenticeship {
+                Text(
+                    "Gib den Betrieb an, bei dem du deine Lehre absolviert hast."
+                )
+                .font(.caption)
+                .foregroundStyle(ZAZUColors.textSecondary)
+            } else {
+                institutionTypeSelection
+            }
+        }
+    }
+    
+
+    @ViewBuilder
+    private var institutionTypeSelection: some View {
+        if !viewModel.educationInstitutionTypes.isEmpty {
+            fieldLabel("Institutionstyp (optional)")
+
+            ZAZUDropdownField(
+                "Institutionstyp",
+                selection: Binding<UUID?>(
+                    get: {
+                        viewModel.selectedInstitutionType?.id
+                    },
+                    set: { newId in
+                        viewModel.selectedInstitutionType =
+                            viewModel.educationInstitutionTypes.first {
+                                $0.id == newId
+                            }
+                    }
+                )
+            ) {
+                Text("Nicht angegeben")
+                    .tag(nil as UUID?)
+
+                ForEach(viewModel.educationInstitutionTypes) { type in
+                    Text(type.nameDe)
+                        .tag(Optional(type.id))
+                }
+            }
+        }
+    }
+
+    private var institutionCatalogSearch: some View {
+        VStack(
+            alignment: .leading,
+            spacing: ZAZUSpacing.small
+        ) {
+            fieldLabel("Hochschule im Katalog suchen")
+
+            textField(
+                "Hochschule suchen (optional)",
+                text: $viewModel.institutionSearchText
+            )
+            .task(id: viewModel.institutionSearchText) {
+                guard !viewModel.institutionSearchText
+                    .trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    )
+                    .isEmpty else {
+                    return
+                }
+
+                do {
+                    try await Task.sleep(
+                        for: .milliseconds(300)
+                    )
+                    try Task.checkCancellation()
+
+                    await viewModel.searchInstitutions()
+                } catch {
+                    // Eine neuere Suche ersetzt diese Anfrage.
+                }
+            }
+
+            if viewModel.isLoadingInstitutions {
+                ProgressView()
+                    .tint(ZAZUColors.primary)
+            } else if !viewModel.institutionSearchText.isEmpty {
+                ForEach(viewModel.educationInstitutions) { institution in
+                    Button {
+                        viewModel.selectInstitution(institution)
+                    } label: {
+                        HStack {
+                            Text(institution.name)
+                                .foregroundStyle(
+                                    ZAZUColors.textPrimary
+                                )
+
+                            Spacer()
+
+                            Image(systemName: "plus.circle")
+                                .foregroundStyle(
+                                    ZAZUColors.primary
+                                )
+                        }
+                        .padding(ZAZUSpacing.small)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    // MARK: - Dates
+
     private var startDateSection: some View {
         VStack(
             alignment: .leading,
@@ -289,92 +776,6 @@ struct EducationView: View {
                     selection: $viewModel.startDate,
                     displayedComponents: .date
                 )
-            }
-        }
-    }
-    
-    private var qualificationSelection: some View {
-        VStack(
-            alignment: .leading,
-            spacing: ZAZUSpacing.small
-        ) {
-            Text("Abschluss / Qualifikation")
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundStyle(ZAZUColors.textPrimary)
-
-            TextField(
-                "Abschluss suchen, z. B. Informatiker",
-                text: $viewModel.qualificationSearchText
-            )
-            .padding(ZAZUSpacing.medium)
-            .background(ZAZUColors.veryLightPurple)
-            .clipShape(
-                RoundedRectangle(cornerRadius: ZAZURadius.medium)
-            )
-            .autocorrectionDisabled()
-            .task(
-                id: "\(viewModel.educationLevel)|\(viewModel.qualificationSearchText)"
-            ) {
-                do {
-                    try await Task.sleep(for: .milliseconds(300))
-                    try Task.checkCancellation()
-                    await viewModel.searchQualifications()
-                } catch is CancellationError {
-                    // Eine neuere Suche hat diese ersetzt.
-                } catch {
-                    // Fehler werden im ViewModel behandelt.
-                }
-            }
-
-            if let selected = viewModel.selectedQualification {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(ZAZUColors.primary)
-
-                    Text(selected.name)
-                        .fontWeight(.medium)
-
-                    Spacer()
-
-                    Button {
-                        viewModel.selectedQualification = nil
-                        viewModel.degree = ""
-                        viewModel.qualificationSearchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(ZAZUColors.textSecondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(ZAZUSpacing.small)
-            }
-
-            if viewModel.isLoadingQualifications {
-                ProgressView()
-                    .tint(ZAZUColors.primary)
-            } else if viewModel.selectedQualification == nil {
-                ForEach(viewModel.qualifications) { qualification in
-                    Button {
-                        viewModel.selectQualification(qualification)
-                    } label: {
-                        HStack {
-                            Text(qualification.name)
-                                .foregroundStyle(ZAZUColors.textPrimary)
-
-                            Spacer()
-
-                            Image(systemName: "plus.circle")
-                                .foregroundStyle(ZAZUColors.primary)
-                        }
-                        .padding(ZAZUSpacing.medium)
-                        .background(ZAZUColors.veryLightPurple)
-                        .clipShape(
-                            RoundedRectangle(cornerRadius: ZAZURadius.medium)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
             }
         }
     }
@@ -400,14 +801,14 @@ struct EducationView: View {
         }
     }
 
+    // MARK: - Description
+
     private var descriptionSection: some View {
         VStack(
             alignment: .leading,
             spacing: ZAZUSpacing.small
         ) {
-            Text("Beschreibung (optional)")
-                .font(.subheadline)
-                .fontWeight(.medium)
+            fieldLabel("Beschreibung (optional)")
 
             TextEditor(text: $viewModel.description)
                 .frame(minHeight: 100)
@@ -420,6 +821,8 @@ struct EducationView: View {
                 )
         }
     }
+
+    // MARK: - Actions
 
     private var addButton: some View {
         Button {
@@ -452,8 +855,6 @@ struct EducationView: View {
         .opacity(viewModel.canSaveEducation ? 1 : 0.5)
     }
 
-    // MARK: - Continue
-
     private var continueButton: some View {
         Button {
             Task {
@@ -464,12 +865,10 @@ struct EducationView: View {
                 }
             }
         } label: {
-            Text(
-                "Weiter"
-            )
-            .fontWeight(.semibold)
-            .frame(maxWidth: .infinity)
-            .frame(height: 52)
+            Text("Weiter")
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
@@ -479,7 +878,7 @@ struct EducationView: View {
         )
     }
 
-    // MARK: - State
+    // MARK: - States
 
     private var loadingView: some View {
         ProgressView()
@@ -490,15 +889,25 @@ struct EducationView: View {
 
     @ViewBuilder
     private var errorMessage: some View {
-        if let errorMessage = viewModel.errorMessage {
-            Text(errorMessage)
+        if let error = viewModel.errorMessage {
+            Text(error)
                 .font(.footnote)
                 .foregroundStyle(.red)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(
+                    maxWidth: .infinity,
+                    alignment: .leading
+                )
         }
     }
 
     // MARK: - Helpers
+
+    private func fieldLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.subheadline)
+            .fontWeight(.medium)
+            .foregroundStyle(ZAZUColors.textPrimary)
+    }
 
     private func textField(
         _ title: String,
@@ -508,7 +917,9 @@ struct EducationView: View {
             .padding(ZAZUSpacing.medium)
             .background(ZAZUColors.veryLightPurple)
             .clipShape(
-                RoundedRectangle(cornerRadius: ZAZURadius.medium)
+                RoundedRectangle(
+                    cornerRadius: ZAZURadius.medium
+                )
             )
     }
 
